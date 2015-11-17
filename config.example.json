@@ -1,0 +1,5 @@
+{
+  "user": "USERNAME",
+  "password": "PASSWORD",
+  "connectString": "HOST/SID"
+}
