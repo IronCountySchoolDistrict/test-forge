@@ -1,5 +1,8 @@
 // Collection of database queries
-import { execute } from './database';
+import {
+  execute
+}
+from './database';
 import orawrap from 'orawrap';
 
 export function getStudentTests(studentNumber, termName, testid) {
@@ -18,8 +21,9 @@ export function getStudentTests(studentNumber, termName, testid) {
                 WHERE
                   name = :term_name AND
                   schoolid = studenttest.schoolid)
-              `,
-              [studentNumber, termName], {outFormat: orawrap.OBJECT})
+              `, [studentNumber, termName], {
+    outFormat: orawrap.OBJECT
+  })
 }
 
 /**
@@ -30,6 +34,23 @@ export function getStudentTests(studentNumber, termName, testid) {
 export function getMatchingTests(searchTerm) {
   return execute(`
     select id, name from test where name like '%'||:searchTerm||'%'
-    `,
-    [searchTerm], {outFormat: orawrap.OBJECT});
+    `, [searchTerm], {
+    outFormat: orawrap.OBJECT
+  });
+}
+
+export function getSchoolId(schoolName) {
+  return execute(`
+    select school_number from schools where name like '%'||:schoolName||'%'
+  `, [schoolName], {
+    outFormat: orawrap.OBJECT
+  });
+}
+
+export function getStudentId(studentPrimaryId) {
+  return execute(`
+    select id from students where student_number=:studentPrimaryId
+  `, [studentPrimaryId], {
+    outFormat: orawrap.OBJECT
+  });
 }

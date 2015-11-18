@@ -4,8 +4,9 @@
     "transform-es2015-arrow-functions",
     "transform-es2015-modules-commonjs",
     "transform-es2015-block-scoping",
+    "transform-es2015-destructuring",
+    "transform-es2015-classes",
     "transform-regenerator",
-    "syntax-async-functions",
-    "transform-runtime"
+    "syntax-async-functions"
   ]
 }

@@ -21,7 +21,7 @@ setOrawrapConfig()
         .usage('[options] <file ...>')
         .option('-v, --version', 'Print Version')
         .command('import <file> [otherFiles...]')
-        .action(function(file, otherFiles) {
+        .action((file, otherFiles) => {
           promptHandler(file);
         });
 
