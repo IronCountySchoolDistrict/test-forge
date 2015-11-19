@@ -1,29 +1,33 @@
 require('babel-polyfill');
 import through from 'through';
-import {
-  getStudentTests,
-  getSchoolId
-}
-from './service';
+import { getMatchingStudentTest } from './service';
 import _ from 'lodash';
-import {inspect} from 'util';
+import { inspect } from 'util';
 import Dibels from './testClasses';
+import json2csv from 'json2csv';
+import Bluebird from 'bluebird';
+import fs from 'fs-promise';
+
+var toCSV = Bluebird.promisify(json2csv);
 
 export default async function transform(csvData, testId) {
   try {
-    let studentTests = await getStudentTests(csvData['Student Primary ID'], csvData['School Year'], testId);
-    if (studentTests.rows.length === 1) {
-      let studentTest = studentTests.rows[0];
-      let { rows } = await getSchoolId(csvData['School Name']);
-      let dibels = new Dibels(csvData, testId, studentTest);
-      let importCsv = await dibels.toImportCsv(studentTest);
-      console.log(importCsv);
-    } else if (!studentTest.rows.length) {
-      console.log('found zero studentTest records, creating new one');
-    } else if (studentTest.rows.length > 1) {
-      console.error(`More than one studentTests record found for Student: ${csvData['Student Primary ID']}`);
+    let studentTests = await getMatchingStudentTest(csvData['Student Primary ID'], csvData['School Year'], testId);
+    if (!studentTests.rows.length) {
+      let dibels = new Dibels(csvData, testId);
+      let importCsv = await dibels.toImportCsv();
+      let csvStr = await toCSV({
+        data: importCsv,
+        del: '\t',
+        hasCSVColumnTitle: false
+      });
+      csvStr = csvStr.replace(/"/g, '');
+      return {
+        csvStr: csvStr,
+        importCsv: importCsv
+      };
     }
   } catch (e) {
-    console.log(e.trace);
+    console.error(e.stack);
   }
 }

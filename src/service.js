@@ -5,7 +5,7 @@ import {
 from './database';
 import orawrap from 'orawrap';
 
-export function getStudentTests(studentNumber, termName, testid) {
+export function getMatchingStudentTest(studentNumber, termName, testid) {
   return execute(`
     SELECT studenttest.*
     FROM studenttest
@@ -35,14 +35,6 @@ export function getMatchingTests(searchTerm) {
   return execute(`
     select id, name from test where name like '%'||:searchTerm||'%'
     `, [searchTerm], {
-    outFormat: orawrap.OBJECT
-  });
-}
-
-export function getSchoolId(schoolName) {
-  return execute(`
-    select school_number from schools where name like '%'||:schoolName||'%'
-  `, [schoolName], {
     outFormat: orawrap.OBJECT
   });
 }

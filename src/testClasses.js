@@ -1,10 +1,11 @@
 require('babel-polyfill');
 
 import {
-  getSchoolId,
   getStudentId
 }
 from './service';
+
+import fs from 'fs-promise';
 
 // Object representation of the Dibels csv data for each student
 export default class Dibels {
@@ -13,22 +14,6 @@ export default class Dibels {
     this.studentPrimaryId = record['Student Primary ID'];
     this.testId = testId;
     this.compositeScore = record['Composite Score'];
-  }
-
-  get schoolId() {
-    return getSchoolId(this.schoolName)
-      .then(r => {
-        try {
-          if (r.rows.length > 1) {
-            throw new Error('Expected getSchoolId() to return one row, got back more than one record');
-          }
-          return new Promise((resolve, reject) => {
-            resolve(r.rows[0].SCHOOL_NUMBER);
-          });
-        } catch (e) {
-          console.error(e.trace);
-        }
-      });
   }
 
   get studentId() {
@@ -50,20 +35,23 @@ export default class Dibels {
   /**
    * Returns an object that represents the data
    * that will be written to a csv file for import.
-   * @param  {object} [studentTest] Check the existing studentTest record for values to update
    * @return {object} Object that will be serialized for the csv file
    */
   async toImportCsv() {
     try {
-      console.log('no studentTest param passed in, using csv values by default');
-      return {
-        studentId: await this.studentId,
-        studentNumber: this.studentPrimaryId,
-        gradeLevel: this.gradeLevel,
-        compositeScoreAlpha: this.compositeScore
+      let config = await fs.readFile('./config.json');
+      let configObj = JSON.parse(config.toString());
+
+      let csvObj = {
+        'Test Date': configObj.testConstants.ROGL_Begin_Year.testDate,
+        'Student Id': await this.studentId,
+        'Student Number': this.studentPrimaryId,
+        'Grade Level': this.gradeLevel,
+        'Composite Score Alpha': this.compositeScore
       }
+      return csvObj;
     } catch (e) {
-      console.log(e.trace);
+      console.log(e.stack);
     }
   }
 }

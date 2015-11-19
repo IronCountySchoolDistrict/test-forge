@@ -3,14 +3,15 @@ require('babel-polyfill');
 import Promise from 'bluebird';
 import orawrap from 'orawrap';
 
-import readFile from 'fs-readfile-promise';
+import fs from 'fs-promise';
 
 import { oraWrapInst } from './index';
 
 export async function setOrawrapConfig() {
   let oraWrapInst = orawrap;
-  let config = await readFile('./config.json');
-  oraWrapInst.setConnectInfo(JSON.parse(config.toString()));
+  let config = await fs.readFile('./config.json');
+  let configObj = JSON.parse(config.toString())
+  oraWrapInst.setConnectInfo(configObj.database);
   return oraWrapInst;
 }
 
