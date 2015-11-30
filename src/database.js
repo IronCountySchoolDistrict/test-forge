@@ -10,9 +10,15 @@ import { oraWrapInst } from './index';
 export async function setOrawrapConfig() {
   let oraWrapInst = orawrap;
   let config = await fs.readFile('./config.json');
-  let configObj = JSON.parse(config.toString())
-  oraWrapInst.setConnectInfo(configObj.database);
-  return oraWrapInst;
+  let configObj = JSON.parse(config.toString());
+  return new Promise((resolve, reject) => {
+    oraWrapInst.createPool(configObj.database, (err, pool) => {
+      if (err) {
+        reject(err);
+      }
+      resolve(oraWrapInst);
+    });
+  });
 }
 
 /**

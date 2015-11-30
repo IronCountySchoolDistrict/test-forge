@@ -5,7 +5,7 @@ import {
 from './database';
 import orawrap from 'orawrap';
 
-export function getMatchingStudentTest(studentNumber, termName, testid) {
+export function getMatchingStudentTest(studentNumber, termName, testId) {
   return execute(`
     SELECT studenttest.*
     FROM studenttest
@@ -21,9 +21,32 @@ export function getMatchingStudentTest(studentNumber, termName, testid) {
                 WHERE
                   name = :term_name AND
                   schoolid = studenttest.schoolid)
-              `, [studentNumber, termName], {
+          AND studenttest.testid=:testId
+              `, [studentNumber, termName, testId], {
     outFormat: orawrap.OBJECT
-  })
+  });
+}
+
+export function getMatchingStudentTestScore(studentNumber, termName, alphaScore, testId) {
+  return execute(`
+    SELECT dcid
+    FROM studenttestscore
+      JOIN studenttest ON studenttest.id = STUDENTTESTSCORE.STUDENTTESTID
+      JOIN students on studenttest.STUDENTID=students.id
+    WHERE students.student_number = :student_number
+          AND studenttestscore.alphascore=:alpha_score
+          AND studenttest.termid IN
+              (
+                SELECT DISTINCT id
+                FROM terms
+                WHERE yearid = (SELECT DISTINCT yearid
+                                FROM terms
+                                WHERE name = :term_name)
+              )
+          AND studenttest.testid = :test_id
+    `, [studentNumber, termName, alphaScore, testId], {
+    outFormat: orawrap.OBJECT
+  });
 }
 
 /**

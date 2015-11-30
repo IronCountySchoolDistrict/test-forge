@@ -1,5 +1,15 @@
 {
   "user": "USERNAME",
   "password": "PASSWORD",
-  "connectString": "HOST/SID"
+  "connectString": "HOST/SID",
+  "poolMax": 20,
+  "poolMin": 2,
+  "poolIncrement": 2,
+  "poolTimeout": 10
+},
+"testConstants": {
+  "ROGL_Begin_Year": {
+    "testDate": "09/30/2015"
+  }
+}
 }

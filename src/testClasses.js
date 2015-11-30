@@ -1,7 +1,8 @@
 require('babel-polyfill');
 
 import {
-  getStudentId
+  getStudentId,
+  getMatchingStudentTestScore
 }
 from './service';
 
@@ -10,10 +11,11 @@ import fs from 'fs-promise';
 // Object representation of the Dibels csv data for each student
 export default class Dibels {
   constructor(record, testId) {
+    console.log(record);
     this.gradeLevel = record['Grade'];
     this.studentPrimaryId = record['Student Primary ID'];
-    this.testId = testId;
     this.compositeScore = record['Composite Score'];
+    this.benchmark = record['Assessment Measure-Composite Score-Levels'];
   }
 
   get studentId() {
@@ -37,7 +39,7 @@ export default class Dibels {
    * that will be written to a csv file for import.
    * @return {object} Object that will be serialized for the csv file
    */
-  async toImportCsv() {
+  async toTestResultsCsv() {
     try {
       let config = await fs.readFile('./config.json');
       let configObj = JSON.parse(config.toString());
@@ -51,7 +53,22 @@ export default class Dibels {
       }
       return csvObj;
     } catch (e) {
-      console.log(e.stack);
+      console.error(e.stack);
+    }
+  }
+
+  async toProficiencyCsv() {
+    try {
+      let studentTestScore = await getMatchingStudentTestScore();
+      let studentTestScoreDcid = studentTestScore.dcid;
+
+      return {
+        'studentTestScoreDcid': studentTestScoreDcid,
+        'proficiency': this.proficiency
+      }
+    }
+    catch (e) {
+      console.error(e.stack);
     }
   }
 }

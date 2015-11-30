@@ -1,12 +1,13 @@
 {
-  "name": "test-importer",
+  "name": "test-forge",
   "version": "1.0.0",
   "description": "A command-line tool for importing UT test data into Powerschool and ICSD's testing Database Extensions",
   "devDependencies": {
     "babel": "^6.0.15",
     "babel-cli": "^6.1.2",
     "babel-core": "^6.1.21",
-    "babel-loader": "^6.1.0",
+    "babel-runtime": "^6.1.18",
+    "babel-polyfill": "^6.1.19",
     "babel-plugin-syntax-async-functions": "^6.1.18",
     "babel-plugin-transform-es2015-arrow-functions": "^6.1.18",
     "babel-plugin-transform-es2015-block-scoping": "^6.1.18",
@@ -15,10 +16,7 @@
     "babel-plugin-transform-es2015-modules-commonjs": "^6.1.20",
     "babel-plugin-transform-es2015-template-literals": "^6.1.18",
     "babel-plugin-transform-regenerator": "^6.1.18",
-    "babel-polyfill": "^6.1.19",
-    "babel-runtime": "^6.1.18",
     "fs-readfile-promise": "^2.0.1",
-    "install": "^0.3.0",
     "npm": "^3.4.0",
     "regenerator": "^0.8.42",
     "source-map-support": "^0.3.3",
@@ -42,8 +40,12 @@
     "lodash": "^3.10.1",
     "oracledb": "^1.4.0",
     "orawrap": "^0.2.4",
-    "terminal-menu": "^2.1.1",
-    "through": "^2.3.8"
+    "progress": "^1.1.8",
+    "terminal-menu": "^2.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:IronCountySchoolDistrict/test-forge.git"
   },
   "preferGlobal": true,
   "bin": {
