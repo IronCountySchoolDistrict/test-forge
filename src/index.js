@@ -4,10 +4,7 @@ import program from 'commander';
 import fs from 'fs-promise';
 
 import promptHandler from './prompt';
-import {
-  setOrawrapConfig
-}
-from './database';
+import { setOrawrapConfig } from './database';
 
 export var oraWrapInst;
 

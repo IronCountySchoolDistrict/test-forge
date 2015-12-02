@@ -1,23 +1,14 @@
 require('babel-polyfill');
 
-import {
-  prompt
-}
-from 'inquirer';
+import { prompt } from 'inquirer';
 import {
   getMatchingTests,
   getStudentTests
 }
 from './service';
 import through from 'through';
-import {
-  createReadStream
-}
-from 'fs';
-import {
-  Writable
-}
-from 'stream';
+import { createReadStream } from 'fs';
+import { Writable } from 'stream';
 import fs from 'fs-promise';
 import csv from 'csv';
 import transform from './transform';
@@ -25,18 +16,9 @@ import byline from 'byline';
 import _ from 'lodash';
 import Bluebird from 'bluebird';
 import json2csv from 'json2csv';
-import {
-  basename
-}
-from 'path';
-import {
-  EOL
-}
-from 'os';
-import {
-  exec
-}
-from 'child_process';
+import { basename, extname } from 'path';
+import { EOL } from 'os';
+import { exec } from 'child_process';
 import ProgressBar from 'progress';
 
 var toCSV = Bluebird.promisify(json2csv);
@@ -103,13 +85,6 @@ export default async function promptHandler(file) {
 
     let readStream = byline(createReadStream(file));
     let printColumns = true;
-    let outputFilename = basename(file);
-    try {
-      let fileStat = await fs.stat(`output/${outputFilename}`);
-      await fs.truncate(`output/${outputFilename}`, 0);
-    } catch (e) {
-      console.log('output file not found, don\'t need to truncate output file');
-    }
 
     let cmd = `wc -l ${file} | cut -f1 -d' '`;
     let numLines = await asyncExec(cmd);
@@ -136,7 +111,15 @@ export default async function promptHandler(file) {
       } else {
         csvOpts.columns = columns;
         let csvObj = await asyncCsvParse(chunk.toString(), csvOpts);
-        let transformed = await transform(csvObj, testId, printColumns);
+        let transformed = await transform(csvObj, testId, importTable);
+
+        let outputFilename = basename(file, extname(file)) + '-' + importTable + extname(file);
+
+        try {
+          await fs.truncate(`output/${outputFilename}`, 0);
+        } catch (e) {
+          console.error(e.stack);
+        }
         if (transformed) {
           if (printColumns) {
             // Pause the stream so columns finish printing to the csv file

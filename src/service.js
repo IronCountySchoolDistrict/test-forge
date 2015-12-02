@@ -29,7 +29,7 @@ export function getMatchingStudentTest(studentNumber, termName, testId) {
 
 export function getMatchingStudentTestScore(studentNumber, termName, alphaScore, testId) {
   return execute(`
-    SELECT dcid
+    SELECT studenttestscore.dcid
     FROM studenttestscore
       JOIN studenttest ON studenttest.id = STUDENTTESTSCORE.STUDENTTESTID
       JOIN students on studenttest.STUDENTID=students.id
@@ -44,7 +44,7 @@ export function getMatchingStudentTestScore(studentNumber, termName, alphaScore,
                                 WHERE name = :term_name)
               )
           AND studenttest.testid = :test_id
-    `, [studentNumber, termName, alphaScore, testId], {
+    `, [studentNumber, alphaScore, termName, testId], {
     outFormat: orawrap.OBJECT
   });
 }

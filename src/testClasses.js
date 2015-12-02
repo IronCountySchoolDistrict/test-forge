@@ -11,22 +11,44 @@ import fs from 'fs-promise';
 // Object representation of the Dibels csv data for each student
 export default class Dibels {
   constructor(record, testId) {
-    console.log(record);
+    this.testId = testId;
     this.gradeLevel = record['Grade'];
     this.studentPrimaryId = record['Student Primary ID'];
     this.compositeScore = record['Composite Score'];
     this.benchmark = record['Assessment Measure-Composite Score-Levels'];
+    this.termName = record['School Year'];
   }
 
   get studentId() {
     try {
       return getStudentId(this.studentPrimaryId)
         .then(r => {
-          if (r.rows.length > 1) {
-            throw new Error('Expected getStudentId() to return one row, got back more than one record');
-          }
           return new Promise((resolve, reject) => {
+            if (r.rows.length > 1) {
+              reject(new Error('Expected getStudentId() to return one row, got back more than one record'));
+            }
             resolve(r.rows[0].ID);
+          });
+        });
+    } catch (e) {
+      console.error(e.trace);
+    }
+  }
+
+  get studentTestScoreDcid() {
+    try {
+      return getMatchingStudentTestScore(
+          this.studentPrimaryId,
+          this.termName,
+          this.compositeScore,
+          this.testId
+        )
+        .then(r => {
+          return new Promise((resolve, reject) => {
+            if (r.rows.length !== 1) {
+              reject(new Error(`Expected studentTestScoreDcid() to return only one row, got back ${r.rows.length} rows`));
+            }
+            resolve(r.rows[0].DCID)
           });
         });
     } catch (e) {
@@ -59,15 +81,11 @@ export default class Dibels {
 
   async toProficiencyCsv() {
     try {
-      let studentTestScore = await getMatchingStudentTestScore();
-      let studentTestScoreDcid = studentTestScore.dcid;
-
       return {
-        'studentTestScoreDcid': studentTestScoreDcid,
-        'proficiency': this.proficiency
+        'studentTestScoreDcid': await this.studentTestScoreDcid,
+        'benchmark': this.benchmark
       }
-    }
-    catch (e) {
+    } catch (e) {
       console.error(e.stack);
     }
   }

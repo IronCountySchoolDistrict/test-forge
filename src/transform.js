@@ -1,8 +1,14 @@
 require('babel-polyfill');
 import through from 'through';
-import { getMatchingStudentTest } from './service';
+import {
+  getMatchingStudentTest
+}
+from './service';
 import _ from 'lodash';
-import { inspect } from 'util';
+import {
+  inspect
+}
+from 'util';
 import Dibels from './testClasses';
 import json2csv from 'json2csv';
 import Bluebird from 'bluebird';
@@ -11,18 +17,24 @@ import detect from './detector';
 
 var toCSV = Bluebird.promisify(json2csv);
 
-export default async function transform(csvData, testId) {
+export default async function transform(csvData, testId, importTable) {
   try {
-    console.log(csvData);
-    let studentTests = await getMatchingStudentTest(csvData['Student Primary ID'], csvData['School Year'], testId);
-    if (!studentTests.rows.length) {
-      let testType = detect(csvData);
-
-      let testObj;
-      if (testType === 'dibels') {
-        testObj = new Dibels(csvData, testId);
+    let importCsv;
+    let testObj;
+    let testType = detect(csvData);
+    if (testType === 'dibels') {
+      testObj = new Dibels(csvData, testId);
+      if (importTable === 'Test Results') {
+        let studentTests = await getMatchingStudentTest(csvData['Student Primary ID'], csvData['School Year'], testId);
+        if (!studentTests.rows.length) {
+          importCsv = await testObj.toTestResultsCsv();
+        }
+      } else if (importTable === 'U_StudentTestProficiency') {
+        importCsv = await testObj.toProficiencyCsv();
       }
-      let importCsv = await testObj.toTestResultsCsv();
+    }
+
+    if (importCsv) {
       let csvStr = await toCSV({
         data: importCsv,
         del: '\t',
@@ -33,7 +45,10 @@ export default async function transform(csvData, testId) {
         csvStr: csvStr,
         importCsv: importCsv
       };
+    } else {
+      return {};
     }
+
   } catch (e) {
     console.error(e.stack);
   }
