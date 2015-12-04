@@ -30,6 +30,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@reactivex/rxjs": "^5.0.0-alpha.11",
     "bluebird": "^3.0.5",
     "byline": "^4.2.1",
     "commander": "^2.9.0",
@@ -41,6 +42,7 @@
     "oracledb": "^1.4.0",
     "orawrap": "^0.2.4",
     "progress": "^1.1.8",
+    "split": "^1.0.0",
     "terminal-menu": "^2.1.1"
   },
   "repository": {
