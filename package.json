@@ -36,6 +36,7 @@
     "commander": "^2.9.0",
     "csv": "^0.4.6",
     "fs-promise": "^0.3.1",
+    "gustav": "^0.6.3",
     "inquirer": "^0.11.0",
     "json2csv": "^3.0.1",
     "lodash": "^3.10.1",
