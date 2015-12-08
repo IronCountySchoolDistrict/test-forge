@@ -48,7 +48,7 @@ async function main() {
       try {
         let csvObservable = createCsvObservable(file);
 
-        promptHandler(csvObservable);
+        promptHandler(csvObservable, file);
       } catch (e) {
         console.error(e.stack);
       }
@@ -65,9 +65,7 @@ function createCsvObservable(file) {
           trailing: false
         })
       )
-    fileStream.on('data', line => {
-      o.next(line)
-    });
+    fileStream.on('data', line => o.next(line));
     fileStream.on('error', err => o.error(err));
     fileStream.on('end', () => o.complete());
   });
