@@ -8,14 +8,17 @@ import split from 'split';
 import promptHandler from './prompt';
 import { setOrawrapConfig } from './database';
 
-import {   Observable } from '@reactivex/rxjs';
+import { Observable } from '@reactivex/rxjs';
 import { createReadStream } from 'fs';
 
 import { zipObject } from 'lodash';
 import csv from 'csv';
 import Bluebird from 'bluebird';
 
+import { msExecute } from './database';
+
 export var oraWrapInst;
+
 var Promise = Bluebird;
 
 async function getPackage() {
@@ -35,26 +38,29 @@ function asyncCsvParse(str, options) {
   });
 }
 
-async function main() {
-  let orawrap = await setOrawrapConfig();
-  oraWrapInst = orawrap;
-  let jsonPackage = await getPackage();
-  program
-    .version(jsonPackage.version)
-    .usage('[options] <file ...>')
-    .option('-v, --version', 'Print Version')
-    .command('import <file> [otherFiles...]')
-    .action((file, otherFiles) => {
-      try {
-        let csvObservable = createCsvObservable(file);
-
-        promptHandler(csvObservable, file);
-      } catch (e) {
-        console.error(e.stack);
-      }
-    });
-
-  program.parse(process.argv);
+function main() {
+  msExecute('select top 100 * from [SAMS_2013].[dbo].[test_concept]')
+  .then(x=>console.log(x))
+  .catch(x=>console.log(x));
+  // setup database connections
+  // oraWrapInst = await setOrawrapConfig();
+  // let jsonPackage = await getPackage();
+  // program
+  //   .version(jsonPackage.version)
+  //   .usage('[options] <file ...>')
+  //   .option('-v, --version', 'Print Version')
+  //   .command('import <file> [otherFiles...]')
+  //   .action((file, otherFiles) => {
+  //     try {
+  //       let csvObservable = createCsvObservable(file);
+  //
+  //       promptHandler(csvObservable, file);
+  //     } catch (e) {
+  //       console.error(e.stack);
+  //     }
+  //   });
+  //
+  // program.parse(process.argv);
 }
 
 function createCsvObservable(file) {
@@ -64,7 +70,7 @@ function createCsvObservable(file) {
         split(null, null, {
           trailing: false
         })
-      )
+      );
     fileStream.on('data', line => o.next(line));
     fileStream.on('error', err => o.error(err));
     fileStream.on('end', () => o.complete());

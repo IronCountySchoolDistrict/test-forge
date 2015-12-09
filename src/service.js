@@ -56,15 +56,27 @@ export function getMatchingStudentTestScore(studentNumber, termName, alphaScore,
  */
 export function getMatchingTests(searchTerm) {
   return execute(`
-    select id, name from test where name like '%'||:searchTerm||'%'
+    SELECT id, name
+    FROM test
+    WHERE name LIKE '%'||:searchTerm||'%'
     `, [searchTerm], {
     outFormat: orawrap.OBJECT
   });
 }
 
+export function getTestDcid(testId) {
+  return execute(`
+    SELECT dcid FROM test WHERE id=:testId
+    `, [testId], {
+      outFormat: orawrap.OBJECT
+    });
+}
+
 export function getStudentId(studentPrimaryId) {
   return execute(`
-    select id from students where student_number=:studentPrimaryId
+    SELECT id
+    FROM students
+    WHERE student_number=:studentPrimaryId
   `, [studentPrimaryId], {
     outFormat: orawrap.OBJECT
   });
