@@ -6,16 +6,31 @@ import fs from 'fs-promise';
 
 import split from 'split';
 import promptHandler from './prompt';
-import { setOrawrapConfig } from './database';
+import {
+  setOrawrapConfig
+}
+from './database';
 
-import { Observable } from '@reactivex/rxjs';
-import { createReadStream } from 'fs';
+import {
+  Observable
+}
+from '@reactivex/rxjs';
+import {
+  createReadStream
+}
+from 'fs';
 
-import { zipObject } from 'lodash';
+import {
+  zipObject
+}
+from 'lodash';
 import csv from 'csv';
 import Bluebird from 'bluebird';
 
-import { msExecute } from './database';
+import {
+  msExecute
+}
+from './database';
 
 export var oraWrapInst;
 
@@ -38,29 +53,31 @@ function asyncCsvParse(str, options) {
   });
 }
 
-function main() {
-  msExecute('select top 100 * from [SAMS_2013].[dbo].[test_concept]')
-  .then(x=>console.log(x))
-  .catch(x=>console.log(x));
-  // setup database connections
-  // oraWrapInst = await setOrawrapConfig();
-  // let jsonPackage = await getPackage();
-  // program
-  //   .version(jsonPackage.version)
-  //   .usage('[options] <file ...>')
-  //   .option('-v, --version', 'Print Version')
-  //   .command('import <file> [otherFiles...]')
-  //   .action((file, otherFiles) => {
-  //     try {
-  //       let csvObservable = createCsvObservable(file);
-  //
-  //       promptHandler(csvObservable, file);
-  //     } catch (e) {
-  //       console.error(e.stack);
-  //     }
-  //   });
-  //
-  // program.parse(process.argv);
+async function main() {
+  oraWrapInst = await setOrawrapConfig();
+  let jsonPackage = await getPackage();
+  program
+    .version(jsonPackage.version)
+    .usage('[command] [options] [file ...]')
+    .option('-v, --version', 'Print Version')
+    .option('-db, --database [value]', 'Use a database as the data source')
+    .command('import [file]')
+    .action((file) => {
+      try {
+        if (program.database && file) {
+          throw new Error(`Expected either a database or file to be given, was given both: database == ${program.database}, file == ${file}`);
+        } else if (file) {
+          let csvObservable = createCsvObservable(file);
+          promptHandler(csvObservable, file);
+        } else if (program.database) {
+          // TODO: create database observable(s) here...
+        }
+      } catch (e) {
+        console.error(e.stack);
+      }
+    });
+
+  program.parse(process.argv);
 }
 
 function createCsvObservable(file) {

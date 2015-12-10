@@ -52,6 +52,7 @@ export default async function promptHandler(source, file) {
       console.log(`Using test with id: ${tests.tests}`);
       let testId = tests.tests;
 
+      // TODO: Make this list dynamic, based on the type of data source given.
       let importQuestion = {
         type: 'list',
         name: 'table',
