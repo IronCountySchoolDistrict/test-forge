@@ -1,8 +1,10 @@
 // Collection of database queries
 import {
-  execute
+  execute,
+  msExecute
 }
 from './database';
+import Promise from 'bluebird';
 import orawrap from 'orawrap';
 
 export function getMatchingStudentTest(studentNumber, termName, testId) {
@@ -80,4 +82,49 @@ export function getStudentId(studentPrimaryId) {
   `, [studentPrimaryId], {
     outFormat: orawrap.OBJECT
   });
+}
+
+export function getStudentIdFromSsid(ssid) {
+  console.log('in getStudentIdFromSsid');
+  return execute(`
+    SELECT id
+    FROM students
+    WHERE State_StudentNumber=:ssid
+  `, [ssid], {
+    outFormat: orawrap.OBJECT
+  });
+}
+
+export function getStudentNumberFromSsid(ssid) {
+  console.log('in getStudentNumberFromSsid');
+  return execute(`
+    SELECT student_number
+    FROM students
+    WHERE State_StudentNumber=:ssid
+  `, [ssid], {
+    outFormat: orawrap.OBJECT
+  });
+}
+
+export function getCrtTestResults() {
+  return msExecute(`
+    SELECT top 5
+      [student_test].school_year,
+      [student_master].ssid,
+      [student_enrollment].grade_level,
+      [student_test].test_overall_score,
+      [test_program].test_program_desc
+    FROM [student_test]
+      INNER JOIN [student_enrollment]
+        ON [student_test].[student_id] = [student_enrollment].[student_id]
+           AND [student_test].school_year = [student_enrollment].school_year
+           AND [student_test].school_number = [student_enrollment].school_number
+      INNER JOIN [student_master]
+        ON [student_test].[student_id] = [student_master].[student_id]
+      INNER JOIN [test_program]
+        ON [student_test].[test_prog_id] = [test_program].[test_prog_id]
+  AND [student_test].test_overall_score != 0
+  AND [student_test].test_overall_score is not null
+    ORDER BY student_test.school_year DESC
+  `);
 }

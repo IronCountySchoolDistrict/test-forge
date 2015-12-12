@@ -5,32 +5,26 @@ import program from 'commander';
 import fs from 'fs-promise';
 
 import split from 'split';
-import promptHandler from './prompt';
-import {
-  setOrawrapConfig
-}
-from './database';
+import { promptHandlerFile, promptHandlerSams } from './prompt';
+import { setOrawrapConfig } from './database';
 
-import {
-  Observable
-}
-from '@reactivex/rxjs';
+import { Observable } from '@reactivex/rxjs';
 import {
   createReadStream
 }
-from 'fs';
+  from 'fs';
 
 import {
   zipObject
 }
-from 'lodash';
+  from 'lodash';
 import csv from 'csv';
 import Bluebird from 'bluebird';
 
 import {
   msExecute
 }
-from './database';
+  from './database';
 
 export var oraWrapInst;
 
@@ -61,22 +55,21 @@ async function main() {
     .usage('[command] [options] [file ...]')
     .option('-v, --version', 'Print Version')
     .option('-db, --database [value]', 'Use a database as the data source')
+    .option('-t, --test [value]', 'Specify which test to create test data for (only used when using database as source)')
     .command('import [file]')
     .action((file) => {
       try {
         if (program.database && file) {
           throw new Error(`Expected either a database or file to be given, was given both: database == ${program.database}, file == ${file}`);
         } else if (file) {
-          let csvObservable = createCsvObservable(file);
-          promptHandler(csvObservable, file);
-        } else if (program.database) {
-          // TODO: create database observable(s) here...
+          promptHandlerFile(createCsvObservable(file), file);
+        } else if (program.database && program.test && program.test === 'CRT') {
+          promptHandlerSams(program.test);
         }
       } catch (e) {
         console.error(e.stack);
       }
     });
-
   program.parse(process.argv);
 }
 
@@ -95,7 +88,7 @@ function createCsvObservable(file) {
 
   let csvOpts = {
     delimiter: '\t'
-  }
+  };
 
   let column = source
     .flatMap(line => {

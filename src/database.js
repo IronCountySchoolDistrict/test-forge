@@ -4,6 +4,7 @@ import Promise from 'bluebird';
 import orawrap from 'orawrap';
 
 import fs from 'fs-promise';
+import { Observable } from '@reactivex/rxjs';
 
 import {
   oraWrapInst
@@ -49,7 +50,7 @@ export function execute(sql, bind, opts) {
         reject(err);
       }
       resolve(results);
-    }
+    };
     args.push(cb);
 
     //global orawrap instance created in index.js
@@ -61,20 +62,28 @@ export function execute(sql, bind, opts) {
   });
 }
 
-export async function msExecute(sql) {
-  let config = await fs.readFile('./config.json');
-  let configObj = JSON.parse(config.toString());
-  return new Promise((resolve, reject) => {
-    var connection = new mssql.Connection(configObj.database.mssql, function(err) {
-
-      var request = new mssql.Request(connection); // or: var request = connection.request();
-      request.query(sql, function(err, recordset) {
-        if (err) {
-          reject(err);
-        }
-        resolve(recordset);
-      });
+export function msExecute(sql) {
+  return fs.readFile('./config.json')
+    .then(config => {
+      return JSON.parse(config.toString());
+    })
+    .then(configObj => {
+      console.log('returning observable');
+      return new Observable(observer => {
+        var connection = new mssql.Connection(configObj.database.sams, function(err) {
+          var request = new mssql.Request(connection);
+          request.stream = true;
+          console.log('creating query');
+          request.query(sql);
+          // request.on('recordset', columns => console.log(columns));
+          request.on('row', row => {console.log('returning row');observer.next(row)});
+          request.on('error', err => {observer.error(err);});
+          request.on('done', () => {
+            observer.complete();
+            connection.close();
+          });
+        });
+        connection.on('error', error=>console.log(`mssql error == ${error}`));
     });
-    connection.on('error', error=>console.log(error));
   });
 }

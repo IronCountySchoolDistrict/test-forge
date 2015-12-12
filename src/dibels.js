@@ -68,14 +68,13 @@ export default class Dibels {
       let config = await fs.readFile('./config.json');
       let configObj = JSON.parse(config.toString());
 
-      let csvObj = {
+      return {
         'Test Date': configObj.testConstants.ROGL_Begin_Year.testDate,
         'Student Id': await this.studentId,
         'Student Number': this.studentPrimaryId,
         'Grade Level': this.gradeLevel,
         'Composite Score Alpha': this.compositeScore
-      }
-      return csvObj;
+      };
     } catch (e) {
       console.error(e.stack);
     }

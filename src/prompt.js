@@ -6,7 +6,7 @@ import {
 from 'inquirer';
 import {
   getMatchingTests,
-  getStudentTests
+  getCrtTestResults
 }
 from './service';
 import detect from './detector';
@@ -30,11 +30,10 @@ function asyncPrompt(questions) {
   });
 }
 
-export default async function promptHandler(source, file) {
+export async function promptHandlerFile(source, file) {
   try {
     source.take(1).subscribe(async function(csvData) {
       let test = detect(csvData);
-      console.log(test);
       let matchingTests = await getMatchingTests(test.name);
       let testChoices = matchingTests.rows.map(test => ({
         name: test.NAME,
@@ -77,10 +76,49 @@ export default async function promptHandler(source, file) {
       let promptResps = {
         testId: testId,
         table: table.table
-      }
+      };
 
       workflow(source, promptResps, file);
     });
+  } catch (e) {
+    console.error(e.stack);
+  }
+}
+
+export async function promptHandlerSams(test) {
+  try {
+      // TODO: Make this list dynamic, based on the type of data source given.
+      let importQuestion = {
+        type: 'list',
+        name: 'table',
+        message: 'Which table/set are you forging import data for?',
+        choices: [{
+          name: 'test-results',
+          value: 'Test Results'
+        }, {
+          name: 'U_StudentTestProficiency',
+          value: 'U_StudentTestProficiency'
+        }, {
+          name: 'U_StudentTestSubscore',
+          value: 'U_StudentTestSubscore'
+        }, {
+          name: 'U_TestSubscore',
+          value: 'U_TestSubscore'
+        }]
+      };
+
+      let table = await asyncPrompt(importQuestion);
+      console.log(`Creating test data for table: ${table.table}`);
+      let promptResps = {
+        table: table.table
+      };
+
+      let source;
+      if (promptResps.table === 'Test Results') {
+        // create Test Results SAMS Observable
+        source = await getCrtTestResults();
+      }
+      workflow(source, promptResps, null, test);
   } catch (e) {
     console.error(e.stack);
   }
