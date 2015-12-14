@@ -8,8 +8,10 @@ import {
 }
 from './service';
 
+import Promise from 'bluebird';
 import fs from 'fs-promise';
 import { Observable } from '@reactivex/rxjs';
+import { asyncPrependFile } from './workflow';
 
 export class CRTTestResults {
   constructor(record, promptOpts) {
@@ -18,6 +20,7 @@ export class CRTTestResults {
     this.schoolYear = record.school_year;
     this.gradeLevel = record.grade_level;
     this.compositeScore = record.test_overall_score;
+    this.testProgramDesc = record.test_program_desc;
   }
 
   get studentId() {
@@ -34,7 +37,6 @@ export class CRTTestResults {
         });
 
     } catch (e) {
-      console.log('in studentId catch');
       console.error(e.trace);
     }
   }
@@ -53,26 +55,87 @@ export class CRTTestResults {
         })
 
     } catch (e) {
-      console.log('in studentNumber catch');
       console.error(e.trace);
     }
   }
 
   async toTestResultsCsv() {
-    console.log('returning test results');
-    //TODO: studentNumber is returning later than studentId
-    //convert the two Promises above to Observables and let both
-    //db queries start at the same time.
+    let asyncProps = await Promise.all([this.studentId, this.studentNumber]);
+
     return {
-      'Test Date': this.schoolYear,
-      'Student Id': await this.studentId,
-      'Student Number': await this.studentNumber,
-      'Grade Level': this.gradeLevel,
-      'Composite Score Alpha': this.compositeScore
-    }
+        'Test Date': this.schoolYear,
+        'Student Id': asyncProps[0],
+        'Student Number': asyncProps[1],
+        'Grade Level': this.gradeLevel,
+        'Composite Score Alpha': this.compositeScore
+    };
   }
 
   createTransformer(promptOpts, record) {
     return Observable.fromPromise(this.toTestResultsCsv());
+  }
+
+  /**
+   * converts a test_program_desc value to a PS.Test.name value
+   * @param  {[type]} testProgramDesc [description]
+   * @return {[type]}                 [description]
+   */
+  outputFilename(testProgramDesc) {
+    if (testProgramDesc.indexOf('Grade Language Arts') !== -1) {
+      return 'CRT - Language Arts';
+    } else if (testProgramDesc.indexOf('Grade Science') !== -1) {
+      return 'CRT - Science';
+    } else if (testProgramDesc.indexOf('Grade Math') !== -1) {
+      return 'CRT - Math';
+    } else if (testProgramDesc.indexOf('Algebra I') !== -1) {
+      return 'CRT - Algebra I';
+    }
+  }
+
+  createCsvSink(config, observer) {
+
+    let testProgSource = observer.groupBy(
+      x => x.extra.testProgramDesc,
+      x => x
+    );
+
+    testProgSource.subscribe(item => {
+      console.log(`item == ${item}`);
+    });
+
+    // observer.first().subscribe(async function(item) {
+    //   let csvStr = await toCSV({
+    //     data: item,
+    //     del: '\t',
+    //     hasCSVColumnTitle: true
+    //   });
+    //   csvStr = csvStr.replace(/"/g, '');
+    //
+    // });
+    //
+    // return observer.subscribe(async function(item) {
+    //   let outputFilename = `output/${this.outputFilename(item.extra.testProgramDesc)}`;
+    //   let hasCSVColumnTitle;
+    //   let fileStat = await fs.stat(outputFilename);
+    //
+    //   try {
+    //     await fs.truncate(outputFilename);
+    //     await fs.asyncPrependFile(`output/${outputFilename}`, `${csvStr}`);
+    //   } catch (e) {
+    //     // output CSV file does not exist, prepend first record into new file
+    //     // input file name-import table name.file extension
+    //
+    //     await asyncPrependFile(`output/${outputFilename}`, `${csvStr}`);
+    //   }
+    //   let csvStr = await toCSV({
+    //     data: item,
+    //     del: '\t',
+    //     hasCSVColumnTitle: true
+    //   });
+    //
+    //   csvStr = csvStr.replace(/"/g, '');
+    //
+    //   await fs.appendFile(`output/${outputFilename}`, `${EOL}${csvStr}`);
+    // });
   }
 }

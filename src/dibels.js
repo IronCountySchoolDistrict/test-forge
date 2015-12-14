@@ -68,10 +68,11 @@ export default class Dibels {
       let config = await fs.readFile('./config.json');
       let configObj = JSON.parse(config.toString());
 
+      let asyncProps = await Promise.all([this.studentId, this.studentPrimaryId]);
       return {
         'Test Date': configObj.testConstants.ROGL_Begin_Year.testDate,
-        'Student Id': await this.studentId,
-        'Student Number': this.studentPrimaryId,
+        'Student Id': asyncProps[0],
+        'Student Number': asyncProps[1],
         'Grade Level': this.gradeLevel,
         'Composite Score Alpha': this.compositeScore
       };
@@ -123,4 +124,6 @@ export default class Dibels {
       }));
     }
   }
+
+
 }

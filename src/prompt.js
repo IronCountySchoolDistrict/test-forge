@@ -12,7 +12,7 @@ from './service';
 import detect from './detector';
 import transform from './transform';
 import json2csv from 'json2csv';
-import workflow from './workflow';
+import { workflow } from './workflow';
 import {
   Observable,
   Node
