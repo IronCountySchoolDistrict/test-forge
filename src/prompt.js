@@ -12,7 +12,8 @@ from './service';
 import detect from './detector';
 import transform from './transform';
 import json2csv from 'json2csv';
-import { workflow } from './workflow';
+// import { workflow } from './workflow';
+import * as crt from './crt';
 import {
   Observable,
   Node
@@ -118,7 +119,8 @@ export async function promptHandlerSams(test) {
         // create Test Results SAMS Observable
         source = await getCrtTestResults();
       }
-      workflow(source, promptResps, null, test);
+      let workflow = crt.createWorkflow(source);
+      workflow.start();
   } catch (e) {
     console.error(e.stack);
   }

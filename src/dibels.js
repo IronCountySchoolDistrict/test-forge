@@ -109,6 +109,7 @@ export default class Dibels {
         if (!studentTests.rows.length) {
           return Observable.fromPromise(this.toTestResultsCsv());
         } else {
+          console.log(studentTests);
           return new Promise.resolve({});
         }
       });

@@ -108,7 +108,7 @@ export function getStudentNumberFromSsid(ssid) {
 
 export function getCrtTestResults() {
   return msExecute(`
-    SELECT top 5
+    SELECT
       [student_test].school_year,
       [student_master].ssid,
       [student_enrollment].grade_level,
@@ -123,9 +123,8 @@ export function getCrtTestResults() {
         ON [student_test].[student_id] = [student_master].[student_id]
       INNER JOIN [test_program]
         ON [student_test].[test_prog_id] = [test_program].[test_prog_id]
-  AND [student_test].test_overall_score != 0
-  AND [student_test].test_overall_score is not null
-  AND [test_program].test_program_desc = '9th Grade Language Arts'
-    ORDER BY student_test.school_year DESC
+        AND [student_test].test_overall_score != 0
+        AND [student_test].test_overall_score is not null
+      ORDER BY student_test.school_year DESC
   `);
 }

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-
+Error.stackTraceLimit = Infinity;
 require('babel-polyfill');
+
 import program from 'commander';
 import fs from 'fs-promise';
 

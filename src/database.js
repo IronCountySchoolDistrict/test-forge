@@ -4,7 +4,10 @@ import Promise from 'bluebird';
 import orawrap from 'orawrap';
 
 import fs from 'fs-promise';
-import { Observable } from '@reactivex/rxjs';
+import {
+  Observable
+}
+from '@reactivex/rxjs';
 
 import {
   oraWrapInst
@@ -76,14 +79,19 @@ export function msExecute(sql) {
           console.log('creating query');
           request.query(sql);
           // request.on('recordset', columns => console.log(columns));
-          request.on('row', row => {console.log('returning row');observer.next(row)});
-          request.on('error', err => {observer.error(err);});
+          request.on('row', row => {
+            console.log('returning row');
+            observer.next(row)
+          });
+          request.on('error', err => {
+            observer.error(err);
+          });
           request.on('done', () => {
             observer.complete();
             connection.close();
           });
         });
-        connection.on('error', error=>console.log(`mssql error == ${error}`));
+        connection.on('error', error => console.log(`mssql error == ${error}`));
+      });
     });
-  });
 }
