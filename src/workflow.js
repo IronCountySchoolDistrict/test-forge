@@ -106,9 +106,7 @@ function transform(config, observer) {
 }
 
 function filterEmpty(observer) {
-  return observer.filter(item => {
-    return !isEmpty(item);
-  });
+
 }
 
 let consoleNode = iO => iO.subscribe(x => {

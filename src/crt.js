@@ -69,6 +69,7 @@ export class CRTTestResults {
     }
   }
 
+
   get studentNumber() {
     try {
       return getStudentNumberFromSsid(this.ssid)
@@ -95,7 +96,6 @@ export class CRTTestResults {
       console.error(e.trace);
     }
   }
-
 }
 
 export function createWorkflow(sourceObservable) {
@@ -104,7 +104,8 @@ export function createWorkflow(sourceObservable) {
   return gustav.createWorkflow()
     .source('dataSource')
     .transf(transformer)
-    .sink(crtCsvSink);
+    // .sink(crtCsvSink);
+    .sink(consoleNode);
 }
 
 function testResultsTransform(observer) {
@@ -113,7 +114,15 @@ function testResultsTransform(observer) {
     .flatMap(item => {
       let test = new CRTTestResults(item);
       return Observable.zip(
-        Observable.fromPromise(Promise.all([test.studentId, test.studentNumber])),
+        Observable.fromPromise(Promise.all([test.studentId, test.studentNumber]))
+          .catch(e => {
+            console.log('in zip catch');
+            console.dir(e);
+            return {
+              asyncProps: {},
+              testResults: {}
+            };
+          }),
         Observable.of(test),
         function(s1, s2) {
           return {
@@ -121,21 +130,27 @@ function testResultsTransform(observer) {
             testResults: s2
           }
         }
-      ).catch(e => {console.log('in zip catch'); console.dir(e);});
+      );
     })
     .map(item => {
-      return {
-        'testResults': {
-          'Test Date': item.testResults.schoolYear,
-          'Student Id': item.asyncProps[0],
-          'Student Number': item.asyncProps[1],
-          'Grade Level': item.testResults.gradeLevel,
-          'Composite Score Alpha': item.testResults.compositeScore
-        },
-        'extra': {
-          testProgramDesc: item.testResults.testProgramDesc
-        }
-      };
+      console.log('in map');
+      console.log(item);
+      if (item.testResults && item.asyncProps) {
+        return {
+          'testResults': {
+            'Test Date': item.testResults.schoolYear,
+            'Student Id': item.asyncProps[0],
+            'Student Number': item.asyncProps[1],
+            'Grade Level': item.testResults.gradeLevel,
+            'Composite Score Alpha': item.testResults.compositeScore
+          },
+          'extra': {
+            testProgramDesc: item.testResults.testProgramDesc
+          }
+        };
+      } else {
+        return {};
+      }
     });
 }
 
@@ -181,6 +196,9 @@ function consoleNode(observer) {
 
 function crtCsvSink(observer) {
   observer
+    .filter(item => {
+      return !isEmpty(item);
+    })
     .groupBy(
       x => toFileName(x.extra.testProgramDesc),
       x => x

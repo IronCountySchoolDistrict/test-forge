@@ -87,9 +87,10 @@ export function getStudentId(studentPrimaryId) {
 export function getStudentIdFromSsid(ssid) {
   console.log('in getStudentIdFromSsid');
   return execute(`
-    SELECT id
+    SELECT ID
     FROM students
     WHERE State_StudentNumber=:ssid
+    AND State_StudentNumber is not null
   `, [ssid], {
     outFormat: orawrap.OBJECT
   });
@@ -98,9 +99,11 @@ export function getStudentIdFromSsid(ssid) {
 export function getStudentNumberFromSsid(ssid) {
   console.log('in getStudentNumberFromSsid');
   return execute(`
-    SELECT student_number
+    SELECT STUDENT_NUMBER
     FROM students
     WHERE State_StudentNumber=:ssid
+    AND State_StudentNumber is not null
+    AND Student_number is not null
   `, [ssid], {
     outFormat: orawrap.OBJECT
   });
@@ -125,6 +128,7 @@ export function getCrtTestResults() {
         ON [student_test].[test_prog_id] = [test_program].[test_prog_id]
         AND [student_test].test_overall_score != 0
         AND [student_test].test_overall_score is not null
+      WHERE [student_master].ssid=1603762
       ORDER BY student_test.school_year DESC
   `);
 }
