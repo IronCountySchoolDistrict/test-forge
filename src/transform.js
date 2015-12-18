@@ -1,14 +1,8 @@
 require('babel-polyfill');
 import through from 'through';
-import {
-  getMatchingStudentTest
-}
-from './service';
+import { getMatchingStudentTest } from './service';
 import _ from 'lodash';
-import {
-  inspect
-}
-from 'util';
+import { inspect } from 'util';
 import Dibels from './testClasses';
 import json2csv from 'json2csv';
 import Bluebird from 'bluebird';

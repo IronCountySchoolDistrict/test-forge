@@ -70,8 +70,8 @@ export function getTestDcid(testId) {
   return execute(`
     SELECT dcid FROM test WHERE id=:testId
     `, [testId], {
-      outFormat: orawrap.OBJECT
-    });
+    outFormat: orawrap.OBJECT
+  });
 }
 
 export function getStudentId(studentPrimaryId) {
@@ -85,19 +85,36 @@ export function getStudentId(studentPrimaryId) {
 }
 
 export function getStudentIdFromSsid(ssid) {
-  console.log('in getStudentIdFromSsid');
   return execute(`
     SELECT ID
     FROM students
     WHERE State_StudentNumber=:ssid
     AND State_StudentNumber is not null
   `, [ssid], {
-    outFormat: orawrap.OBJECT
-  });
+      outFormat: orawrap.OBJECT
+    })
+    .then(r => {
+      return new Promise((resolve, reject) => {
+        if (r.rows.length > 1) {
+          reject({
+            error: new Error(`Expected getStudentIdFromSsid() to return one row, got back ${r.rows.length} records`),
+            response: r
+          });
+        } else {
+          try {
+            resolve(r.rows[0].ID);
+          } catch (e) {
+            reject({
+              error: e,
+              response: r
+            })
+          }
+        }
+      });
+    });
 }
 
 export function getStudentNumberFromSsid(ssid) {
-  console.log('in getStudentNumberFromSsid');
   return execute(`
     SELECT STUDENT_NUMBER
     FROM students
@@ -105,13 +122,33 @@ export function getStudentNumberFromSsid(ssid) {
     AND State_StudentNumber is not null
     AND Student_number is not null
   `, [ssid], {
-    outFormat: orawrap.OBJECT
-  });
+      outFormat: orawrap.OBJECT
+    })
+    .then(r => {
+      return new Promise((resolve, reject) => {
+        if (r.rows.length > 1) {
+          reject({
+            error: new Error(`Expected getStudentNumberFromSsid() to return one row, got back ${r.rows.length} records`),
+            response: r
+          });
+        } else {
+          try {
+            resolve(r.rows[0].STUDENT_NUMBER);
+          } catch (e) {
+            return {
+              error: new Error(`Could not access r.rows[0].STUDENT_NUMBER`),
+              response: r
+            }
+          }
+        }
+      });
+    });
 }
 
 export function getCrtTestResults() {
   return msExecute(`
-    SELECT
+    SELECT top 30
+      [student_test].student_test_id,
       [student_test].school_year,
       [student_master].ssid,
       [student_enrollment].grade_level,
@@ -128,7 +165,10 @@ export function getCrtTestResults() {
         ON [student_test].[test_prog_id] = [test_program].[test_prog_id]
         AND [student_test].test_overall_score != 0
         AND [student_test].test_overall_score is not null
-      WHERE [student_master].ssid=1603762
+
+      WHERE [student_enrollment].district_id=635
+      and [test_program].test_program_desc = '9th Grade Language Arts'
+      --and [student_master].ssid=1260838
       ORDER BY student_test.school_year DESC
   `);
 }

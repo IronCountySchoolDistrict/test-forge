@@ -71,7 +71,6 @@ export function msExecute(sql) {
       return JSON.parse(config.toString());
     })
     .then(configObj => {
-      console.log('returning observable');
       return new Observable(observer => {
         var connection = new mssql.Connection(configObj.database.sams, function(err) {
           var request = new mssql.Request(connection);
@@ -80,7 +79,6 @@ export function msExecute(sql) {
           request.query(sql);
           // request.on('recordset', columns => console.log(columns));
           request.on('row', row => {
-            console.log('returning row');
             observer.next(row)
           });
           request.on('error', err => {

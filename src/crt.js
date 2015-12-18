@@ -6,33 +6,39 @@ import {
   getTestDcid,
   getMatchingStudentTestScore
 }
-from './service';
+  from './service';
 
 import Promise from 'bluebird';
 import fs from 'fs-promise';
-import {
-  Observable
-}
-from '@reactivex/rxjs';
-import {
-  asyncPrependFile
-}
-from './workflow';
-import {
-  isEmpty
-}
-from 'lodash';
-import {
-  gustav
-}
-from 'gustav';
-import {
-  EOL
-}
-from 'os';
+import {appendFileSync} from 'fs';
+import { Observable } from '@reactivex/rxjs';
+import { asyncPrependFile } from './workflow';
+import { isEmpty } from 'lodash';
+import { gustav } from 'gustav';
+import { EOL } from 'os';
 import json2csv from 'json2csv';
+import util from 'util';
+import { logger } from './index';
+import winston from 'winston';
 
 var toCSV = Promise.promisify(json2csv);
+
+var count = 0;
+var blankCount = 0;
+
+async function asyncExec(command) {
+  return new Promise((resolve, reject) => {
+    exec(command, function (error, stdout, stderr) {
+      if (error) {
+        reject(error);
+      } else if (stderr) {
+        reject(stderr);
+      } else {
+        resolve(stdout);
+      }
+    });
+  });
+}
 
 export class CRTTestResults {
   constructor(record) {
@@ -42,60 +48,6 @@ export class CRTTestResults {
     this.compositeScore = record.test_overall_score;
     this.testProgramDesc = record.test_program_desc;
   }
-
-  get studentId() {
-    try {
-      return getStudentIdFromSsid(this.ssid)
-        .then(r => {
-          return new Promise((resolve, reject) => {
-            console.log('settled Promise for studentId()');
-            if (r.rows.length > 1) {
-              console.dir(r);
-              console.dir(this);
-              reject(new Error('Expected getStudentId() to return one row, got back more than one record'));
-            } else {
-              try {
-                resolve(r.rows[0].ID);
-              } catch (e) {
-                console.dir(r);
-                console.dir(this);
-              }
-            }
-          });
-        });
-
-    } catch (e) {
-      console.error(e.trace);
-    }
-  }
-
-
-  get studentNumber() {
-    try {
-      return getStudentNumberFromSsid(this.ssid)
-        .then(r => {
-          return new Promise((resolve, reject) => {
-            console.log('settled Promise for studentNumber()');
-            if (r.rows.length > 1) {
-              console.dir(r);
-              console.dir(this);
-              reject(new Error('Expected getStudentDcidFromSsid() to return one row, got back more than one record'));
-            } else {
-              try {
-                resolve(r.rows[0].STUDENT_NUMBER);
-              } catch (e) {
-                console.error(e.trace);
-                console.dir(r);
-                console.dir(this);
-              }
-            }
-          });
-        })
-
-    } catch (e) {
-      console.error(e.trace);
-    }
-  }
 }
 
 export function createWorkflow(sourceObservable) {
@@ -104,52 +56,60 @@ export function createWorkflow(sourceObservable) {
   return gustav.createWorkflow()
     .source('dataSource')
     .transf(transformer)
-    // .sink(crtCsvSink);
-    .sink(consoleNode);
+    .transf(filterEmpty)
+    .sink(crtCsvSink);
+  // .sink(consoleNode);
 }
 
 function testResultsTransform(observer) {
-
   return observer
     .flatMap(item => {
-      let test = new CRTTestResults(item);
+      let asyncProps = [getStudentNumberFromSsid(item.ssid), getStudentIdFromSsid(item.ssid)];
       return Observable.zip(
-        Observable.fromPromise(Promise.all([test.studentId, test.studentNumber]))
+        Observable.fromPromise(
+          Promise.all(asyncProps)
+          )
           .catch(e => {
-            console.log('in zip catch');
-            console.dir(e);
-            return {
-              asyncProps: {},
-              testResults: {}
-            };
+            logger.log('info', `Error fetching student fields for ssid: ${item.ssid}`, {
+              psDbError: util.inspect(e, {
+                showHidden: false,
+                depth: null
+              })
+            });
+            logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
+              sourceData: util.inspect(item, {
+                showHidden: false,
+                depth: null
+              })
+            });
+            return Observable.of({});
           }),
-        Observable.of(test),
-        function(s1, s2) {
+        Observable.of(item),
+        function (s1, s2) {
           return {
             asyncProps: s1,
             testResults: s2
-          }
+          };
         }
       );
     })
     .map(item => {
-      console.log('in map');
-      console.log(item);
-      if (item.testResults && item.asyncProps) {
+      if (!isEmpty(item.asyncProps)) {
         return {
           'testResults': {
-            'Test Date': item.testResults.schoolYear,
+            'Test Date': item.testResults.school_year,
             'Student Id': item.asyncProps[0],
             'Student Number': item.asyncProps[1],
-            'Grade Level': item.testResults.gradeLevel,
-            'Composite Score Alpha': item.testResults.compositeScore
+            'Grade Level': item.testResults.grade_level,
+            'Composite Score Alpha': item.testResults.test_overall_score
           },
           'extra': {
-            testProgramDesc: item.testResults.testProgramDesc
+            testProgramDesc: item.testResults.test_program_desc,
+            studentTestId: item.testResults.student_test_id
           }
         };
       } else {
-        return {};
+        return item;
       }
     });
 }
@@ -158,10 +118,20 @@ function transformer(observer) {
   return testResultsTransform(observer);
 }
 
+function filterEmpty(observer) {
+  return observer
+    .filter(item => {
+      if (!(!isEmpty(item.testResults) && !isEmpty(item.extra))) {
+        blankCount++;
+      }
+      return !isEmpty(item.testResults) && !isEmpty(item.extra);
+    });
+}
+
 /**
  * converts a test_program_desc value to a PS.Test.name value
  * @param  {[type]} testProgramDesc [description]
- * @return {[type]}                 [description]
+ * @return {string}                 output file name
  */
 function toFileName(testProgramDesc) {
   if (testProgramDesc.indexOf('Grade Language Arts') !== -1) {
@@ -175,74 +145,103 @@ function toFileName(testProgramDesc) {
   } else if (testProgramDesc.indexOf('Biology') !== -1) {
     return 'EOL - Biology';
   } else if (testProgramDesc.indexOf('UAA Math') !== -1) {
-    return 'UAA Math';
+    return 'EOL - UAA Math';
   } else if (testProgramDesc.indexOf('UAA Language') !== -1) {
-    return 'UAA Language';
+    return 'EOL - UAA Language';
   } else if (testProgramDesc.indexOf('UAA Science') !== -1) {
-    return 'UAA Science';
+    return 'EOL - UAA Science';
   } else if (testProgramDesc.indexOf('Earth Systems Science') !== -1 ||
     testProgramDesc.indexOf('Earth Sytems Science') !== -1) {
     return 'EOL - Earth Systems Science';
-  } else if (testProgramDesc.indexOf('6th Grade Math Common Core')) {
+  } else if (testProgramDesc.indexOf('6th Grade Math Common Core') !== -1) {
     return 'EOL - Math Common Core';
-  } else if (testProgramDesc.indexOf('6th Grade Math Existing Core')) {
+  } else if (testProgramDesc.indexOf('6th Grade Math Existing Core') !== -1) {
     return 'EOL - Math Existing Core';
+  } else if (testProgramDesc.indexOf('Direct Writing I') !== -1) {
+    return 'EOL - Direct Writing I';
+  } else if (testProgramDesc.indexOf('Direct Writing II') !== -1) {
+    return 'EOL - Direct Writing II';
+  } else if (testProgramDesc.indexOf('Direct Writing') !== -1) {
+    return 'EOL - Direct Writing';
+  } else if (testProgramDesc.indexOf('Pre-Algebra') !== -1) {
+    return 'EOL - Pre-Algebra';
+  } else if (testProgramDesc.indexOf('Algebra I') !== -1) {
+    return 'EOL - Algebra I';
+  } else if (testProgramDesc.indexOf('Algebra II') !== -1) {
+    return 'EOL - Algebra II';
+  } else if (testProgramDesc.indexOf('Geometry') !== -1) {
+    return 'EOL - Geometry';
+  } else if (testProgramDesc.indexOf('Chemistry') !== -1) {
+    return 'EOL - Chemistry';
+  } else if (testProgramDesc.indexOf('Elementary Algebra') !== -1) {
+    return 'EOL - Elementary Algebra';
+  } else if (testProgramDesc.indexOf('Physics') !== -1) {
+    return 'EOL - Physics';
+  } else {
+    return 'other';
   }
 }
 
 function consoleNode(observer) {
-  observer.subscribe(x => console.log(x));
+  observer.subscribe(x => {
+    console.log('in consoleNode');
+    console.dir(x);
+    console.log(`x == ${x}`);
+  });
 }
 
 function crtCsvSink(observer) {
-  observer
-    .filter(item => {
-      return !isEmpty(item);
-    })
+  return observer
     .groupBy(
       x => toFileName(x.extra.testProgramDesc),
       x => x
     )
     .subscribe(obs => {
-      obs.first().subscribe(async function(item) {
+      obs.first().subscribe(function (item) {
         console.log('in first');
-        console.log(item);
         let outputFilename = `output/${toFileName(item.extra.testProgramDesc)}.txt`;
 
-        let csvStr = await toCSV({
+        toCSV({
           data: item.testResults,
           del: '\t',
           hasCSVColumnTitle: true
-        });
-        csvStr = csvStr.replace(/"/g, '');
+        })
+          .then(csvStr => {
+            csvStr = csvStr.replace(/"/g, '');
 
-        try {
-          console.log(`truncating ${outputFilename}`)
-          await fs.truncate(outputFilename);
+            fs.truncate(outputFilename)
+              .then(() => {
+                asyncPrependFile(outputFilename, csvStr);
+              });
+          });
 
-          // input file name-import table name.file extension
-          await asyncPrependFile(outputFilename, csvStr);
-        } catch (e) {
-          // input file name-import table name.file extension
-          await asyncPrependFile(outputFilename, csvStr);
-        }
+        count++;
+        console.log('still in first');
+        console.log('count == %j', count);
+
       });
 
-      return obs.skip(1).subscribe(async function(item) {
-        console.log('in not first');
-        console.log(item);
+      obs.skip(1).subscribe(function (item) {
+        console.log('in skip(1) subscribe');
         let outputFilename = `output/${toFileName(item.extra.testProgramDesc)}.txt`;
-        let hasCSVColumnTitle;
-        let csvStr = await toCSV({
+
+        toCSV({
           data: item.testResults,
           del: '\t',
           hasCSVColumnTitle: false
-        });
-        console.log(csvStr);
+        })
+          .then(csvStr => {
 
-        csvStr = csvStr.replace(/"/g, '');
-
-        await fs.appendFile(outputFilename, `${EOL}${csvStr}`);
+            csvStr = csvStr.replace(/"/g, '');
+            console.log('csvStr == %j', csvStr);
+            fs.appendFile(outputFilename, `${EOL}${csvStr}`)
+              .then(() => {
+                count++;
+                console.log('count == %j', count);
+                console.log('blankCount == %j', blankCount);
+                console.log('total == %j', count + blankCount);
+              })
+          });
       });
     });
 }
