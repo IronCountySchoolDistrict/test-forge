@@ -6,19 +6,40 @@ import {
   getTestDcid,
   getMatchingStudentTestScore
 }
-  from './service';
+from './service';
 
 import Promise from 'bluebird';
 import fs from 'fs-promise';
-import {appendFileSync} from 'fs';
-import { Observable } from '@reactivex/rxjs';
-import { asyncPrependFile } from './workflow';
-import { isEmpty } from 'lodash';
-import { gustav } from 'gustav';
-import { EOL } from 'os';
+import {
+  appendFileSync, createWriteStream, write
+}
+from 'fs';
+import {
+  Observable
+}
+from '@reactivex/rxjs';
+import {
+  asyncPrependFile
+}
+from './workflow';
+import {
+  isEmpty
+}
+from 'lodash';
+import {
+  gustav
+}
+from 'gustav';
+import {
+  EOL
+}
+from 'os';
 import json2csv from 'json2csv';
 import util from 'util';
-import { logger } from './index';
+import {
+  logger
+}
+from './index';
 import winston from 'winston';
 
 var toCSV = Promise.promisify(json2csv);
@@ -28,7 +49,7 @@ var blankCount = 0;
 
 async function asyncExec(command) {
   return new Promise((resolve, reject) => {
-    exec(command, function (error, stdout, stderr) {
+    exec(command, function(error, stdout, stderr) {
       if (error) {
         reject(error);
       } else if (stderr) {
@@ -68,24 +89,24 @@ function testResultsTransform(observer) {
       return Observable.zip(
         Observable.fromPromise(
           Promise.all(asyncProps)
-          )
-          .catch(e => {
-            logger.log('info', `Error fetching student fields for ssid: ${item.ssid}`, {
-              psDbError: util.inspect(e, {
-                showHidden: false,
-                depth: null
-              })
-            });
-            logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
-              sourceData: util.inspect(item, {
-                showHidden: false,
-                depth: null
-              })
-            });
-            return Observable.of({});
-          }),
+        )
+        .catch(e => {
+          logger.log('info', `Error fetching student fields for ssid: ${item.ssid}`, {
+            psDbError: util.inspect(e, {
+              showHidden: false,
+              depth: null
+            })
+          });
+          logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
+            sourceData: util.inspect(item, {
+              showHidden: false,
+              depth: null
+            })
+          });
+          return Observable.of({});
+        }),
         Observable.of(item),
-        function (s1, s2) {
+        function(s1, s2) {
           return {
             asyncProps: s1,
             testResults: s2
@@ -124,7 +145,8 @@ function filterEmpty(observer) {
       if (!(!isEmpty(item.testResults) && !isEmpty(item.extra))) {
         blankCount++;
       }
-      return !isEmpty(item.testResults) && !isEmpty(item.extra);
+      let empty = !isEmpty(item.testResults) && !isEmpty(item.extra);
+      return empty;
     });
 }
 
@@ -192,56 +214,51 @@ function consoleNode(observer) {
 
 function crtCsvSink(observer) {
   return observer
-    .groupBy(
-      x => toFileName(x.extra.testProgramDesc),
-      x => x
-    )
+    .groupBy(x => toFileName(x.extra.testProgramDesc))
     .subscribe(obs => {
-      obs.first().subscribe(function (item) {
-        console.log('in first');
-        let outputFilename = `output/${toFileName(item.extra.testProgramDesc)}.txt`;
-
-        toCSV({
-          data: item.testResults,
-          del: '\t',
-          hasCSVColumnTitle: true
-        })
-          .then(csvStr => {
-            csvStr = csvStr.replace(/"/g, '');
-
-            fs.truncate(outputFilename)
-              .then(() => {
-                asyncPrependFile(outputFilename, csvStr);
-              });
+      let ws;
+      let outputFilename;
+      let csvGroupObs = obs.concatMap((item, i) => {
+        if (i === 0) {
+          outputFilename = `output/${toFileName(item.extra.testProgramDesc)}.txt`;
+          ws = createWriteStream(outputFilename, {
+            flags: 'a'
           });
-
-        count++;
-        console.log('still in first');
-        console.log('count == %j', count);
-
-      });
-
-      obs.skip(1).subscribe(function (item) {
-        console.log('in skip(1) subscribe');
-        let outputFilename = `output/${toFileName(item.extra.testProgramDesc)}.txt`;
-
-        toCSV({
-          data: item.testResults,
-          del: '\t',
-          hasCSVColumnTitle: false
-        })
-          .then(csvStr => {
-
-            csvStr = csvStr.replace(/"/g, '');
-            console.log('csvStr == %j', csvStr);
-            fs.appendFile(outputFilename, `${EOL}${csvStr}`)
-              .then(() => {
-                count++;
-                console.log('count == %j', count);
-                console.log('blankCount == %j', blankCount);
-                console.log('total == %j', count + blankCount);
+          try {
+            fs.truncateSync(outputFilename);
+            return toCSV({
+                data: item.testResults,
+                del: '\t',
+                hasCSVColumnTitle: true
               })
-          });
+              .then(csvStr => {
+                return Observable.of(csvStr.replace(/"/g, ''));
+              });
+          } catch (e) {
+            return toCSV({
+                data: item.testResults,
+                del: '\t',
+                hasCSVColumnTitle: true
+              })
+              .then(csvStr => {
+                return Observable.of(csvStr.replace(/"/g, ''));
+              });
+          }
+        } else {
+          return toCSV({
+              data: item.testResults,
+              del: '\t',
+              hasCSVColumnTitle: false
+            })
+            .then(csvStr => {
+              return Observable.of(EOL + csvStr.replace(/"/g, ''));
+            });
+        }
       });
+
+      csvGroupObs.subscribe(csvStr => {
+        ws.write(csvStr.value);
+      });
+
     });
 }
