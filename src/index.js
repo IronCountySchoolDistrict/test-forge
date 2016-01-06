@@ -80,6 +80,7 @@ async function main() {
   program.parse(process.argv);
 }
 
+// TODO: only works on files with >1 lines. Make this work with source file with only 1 line.
 function createCsvObservable(file) {
   let source = new Observable(o => {
     let fileStream = createReadStream(file)

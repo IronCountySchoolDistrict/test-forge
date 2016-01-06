@@ -6,6 +6,14 @@ import {
 from './database';
 import Promise from 'bluebird';
 import orawrap from 'orawrap';
+import {
+  Observable
+}
+from '@reactivex/rxjs';
+import {
+  logger
+}
+from './index';
 
 export function getMatchingStudentTest(studentNumber, termName, testId) {
   return execute(`
@@ -29,6 +37,12 @@ export function getMatchingStudentTest(studentNumber, termName, testId) {
   });
 }
 
+/**
+ * get the PS.StudentTestScore record that matches the data passed in
+ * @return {Promise}              returns a Promise that resolves with the results
+ * if exactly one match is found. If zero matches, or more than match,
+ * is found, reject with an error message.
+ */
 export function getMatchingStudentTestScore(studentNumber, termName, alphaScore, testId) {
   return execute(`
     SELECT studenttestscore.dcid
@@ -47,6 +61,29 @@ export function getMatchingStudentTestScore(studentNumber, termName, alphaScore,
               )
           AND studenttest.testid = :test_id
     `, [studentNumber, alphaScore, termName, testId], {
+    outFormat: orawrap.OBJECT
+  });
+}
+
+export function getMatchingProficiency(studentNumber, termName, alphaScore, testId) {
+  return execute(`
+    SELECT u_studenttestproficiency.id
+    FROM studenttestscore
+      JOIN studenttest ON studenttest.id = STUDENTTESTSCORE.STUDENTTESTID
+      JOIN students ON studenttest.STUDENTID = students.id
+      JOIN u_studenttestproficiency ON STUDENTTESTSCORE.DCID = U_STUDENTTESTPROFICIENCY.STUDENTTESTSCOREDCID
+    WHERE students.student_number = :student_number
+          AND studenttestscore.alphascore = :alpha_score
+          AND studenttest.termid IN
+              (
+                SELECT DISTINCT id
+                FROM terms
+                WHERE yearid = (SELECT DISTINCT yearid
+                                FROM terms
+                                WHERE name = :term_name)
+              )
+          AND studenttest.testid = :test_id
+          `, [studentNumber, alphaScore, termName, testId], {
     outFormat: orawrap.OBJECT
   });
 }
@@ -74,17 +111,37 @@ export function getTestDcid(testId) {
   });
 }
 
-export function getStudentId(studentPrimaryId) {
+export function getStudentIdFromStudentNumber(studentNumber) {
   return execute(`
     SELECT id
     FROM students
-    WHERE student_number=:studentPrimaryId
-  `, [studentPrimaryId], {
-    outFormat: orawrap.OBJECT
-  });
+    WHERE student_number=:studentNumber
+  `, [studentNumber], {
+      outFormat: orawrap.OBJECT
+    })
+    .then(r => {
+      return new Promise((resolve, reject) => {
+        if (r.rows.length > 1) {
+          reject({
+            error: new Error(`Expected getStudentIdFromStudentNumber() to return one row, got back ${r.rows.length} records`),
+            response: r
+          });
+        } else {
+          try {
+            resolve(r.rows[0].ID);
+          } catch (e) {
+            reject({
+              error: e,
+              response: r
+            })
+          }
+        }
+      });
+    });
 }
 
 export function getStudentIdFromSsid(ssid) {
+  console.log('in getStudentIdFromSsid');
   return execute(`
     SELECT ID
     FROM students
@@ -115,6 +172,7 @@ export function getStudentIdFromSsid(ssid) {
 }
 
 export function getStudentNumberFromSsid(ssid) {
+  console.log('in getStudentNumberFromSsid');
   return execute(`
     SELECT STUDENT_NUMBER
     FROM students
@@ -167,8 +225,6 @@ export function getCrtTestResults() {
         AND [student_test].test_overall_score is not null
 
       WHERE [student_enrollment].district_id=635
-      and [test_program].test_program_desc = '8th Grade Language Arts'
---       and [student_enrollment].grade_level='07'
       ORDER BY [student_master].ssid DESC
   `);
 }

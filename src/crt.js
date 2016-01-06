@@ -3,17 +3,15 @@ require('babel-polyfill');
 import {
   getStudentIdFromSsid,
   getStudentNumberFromSsid,
-  getTestDcid,
-  getMatchingStudentTestScore
+  getTestDcid
 }
 from './service';
-
-import Promise from 'bluebird';
-import fs from 'fs-promise';
 import {
-  appendFileSync, createWriteStream, write
+  createWriteStream
 }
 from 'fs';
+import Promise from 'bluebird';
+import fs from 'fs-promise';
 import {
   Observable
 }
@@ -30,17 +28,17 @@ import {
   gustav
 }
 from 'gustav';
-import {
-  EOL
-}
-from 'os';
 import json2csv from 'json2csv';
 import util from 'util';
 import {
   logger
 }
 from './index';
-import winston from 'winston';
+
+import {
+  EOL
+}
+from 'os';
 
 var toCSV = Promise.promisify(json2csv);
 
@@ -61,16 +59,6 @@ async function asyncExec(command) {
   });
 }
 
-export class CRTTestResults {
-  constructor(record) {
-    this.ssid = record.ssid;
-    this.schoolYear = record.school_year;
-    this.gradeLevel = record.grade_level;
-    this.compositeScore = record.test_overall_score;
-    this.testProgramDesc = record.test_program_desc;
-  }
-}
-
 export function createWorkflow(sourceObservable) {
   gustav.source('dataSource', () => sourceObservable);
 
@@ -87,9 +75,8 @@ function testResultsTransform(observer) {
     .flatMap(item => {
       let asyncProps = [getStudentNumberFromSsid(item.ssid), getStudentIdFromSsid(item.ssid)];
       return Observable.zip(
-        Observable.fromPromise(
-          Promise.all(asyncProps)
-        )
+
+        Observable.fromPromise(Promise.all(asyncProps))
         .catch(e => {
           logger.log('info', `Error fetching student fields for ssid: ${item.ssid}`, {
             psDbError: util.inspect(e, {
@@ -105,13 +92,16 @@ function testResultsTransform(observer) {
           });
           return Observable.of({});
         }),
+
         Observable.of(item),
+
         function(s1, s2) {
           return {
             asyncProps: s1,
             testResults: s2
           };
         }
+
       );
     })
     .map(item => {
@@ -145,14 +135,14 @@ function filterEmpty(observer) {
       if (!(!isEmpty(item.testResults) && !isEmpty(item.extra))) {
         blankCount++;
       }
-      let empty = !isEmpty(item.testResults) && !isEmpty(item.extra);
-      return empty;
+      let notEmpty = !isEmpty(item.testResults) && !isEmpty(item.extra);
+      return notEmpty;
     });
 }
 
 /**
  * converts a test_program_desc value to a PS.Test.name value
- * @param  {[type]} testProgramDesc [description]
+ * @param  {string} testProgramDesc PS.Test.name
  * @return {string}                 output file name
  */
 function toFileName(testProgramDesc) {
@@ -215,50 +205,63 @@ function consoleNode(observer) {
 function crtCsvSink(observer) {
   return observer
     .groupBy(x => toFileName(x.extra.testProgramDesc))
-    .subscribe(obs => {
-      let ws;
-      let outputFilename;
-      let csvGroupObs = obs.concatMap((item, i) => {
-        if (i === 0) {
-          outputFilename = `output/${toFileName(item.extra.testProgramDesc)}.txt`;
-          ws = createWriteStream(outputFilename, {
-            flags: 'a'
-          });
-          try {
-            fs.truncateSync(outputFilename);
-            return toCSV({
-                data: item.testResults,
-                del: '\t',
-                hasCSVColumnTitle: true
-              })
-              .then(csvStr => {
-                return Observable.of(csvStr.replace(/"/g, ''));
-              });
-          } catch (e) {
-            return toCSV({
-                data: item.testResults,
-                del: '\t',
-                hasCSVColumnTitle: true
-              })
-              .then(csvStr => {
-                return Observable.of(csvStr.replace(/"/g, ''));
-              });
-          }
-        } else {
-          return toCSV({
-              data: item.testResults,
-              del: '\t',
-              hasCSVColumnTitle: false
-            })
-            .then(csvStr => {
-              return Observable.of(EOL + csvStr.replace(/"/g, ''));
-            });
-        }
-      });
+    .subscribe(groupedObservable => {
 
-      csvGroupObs.subscribe(csvStr => {
-        ws.write(csvStr.value);
+      let ws;
+      toCsvObservable(groupedObservable).subscribe(item => {
+        if (!ws && item.ws) {
+          ws = item.ws;
+        }
+        ws.write(item.csv);
       });
 
     });
+}
+
+/**
+ * maps objects emitted by srcObservable to a new Observable that
+ * converts those objects to csv strings and emits the results
+ * @param  {GroupedObservable} observable source Observable
+ * @return {object}
+ *      	{
+ *     			observable: // new observable that emits csv data derived from @param srcObservable
+ *         	ws: writable file stream to write results to file system
+ *     		}
+ */
+function toCsvObservable(srcObservable) {
+  return srcObservable.concatMap(async function(item, i) {
+    if (i === 0) {
+      let outputFilename = `output/${toFileName(item.extra.testProgramDesc)}.txt`;
+
+      // creates file if it doesn't exist
+      var ws = createWriteStream(outputFilename, {
+        flags: 'a'
+      });
+
+      await fs.truncate(outputFilename);
+    }
+
+    return toCSV({
+        data: item.testResults,
+        del: '\t',
+        hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
+      })
+      .then(csvStr => {
+        let csvRemQuotes = csvStr.replace(/"/g, '');
+
+        // Add a newline character before every line except the first line
+        let csvVal = i === 0 ? csvRemQuotes : EOL + csvRemQuotes;
+
+        if (ws) {
+          return {
+            csv: csvVal,
+            ws: ws
+          };
+        } else {
+          return {
+            csv: csvVal
+          };
+        }
+      });
+  });
 }

@@ -14,6 +14,7 @@ import transform from './transform';
 import json2csv from 'json2csv';
 // import { workflow } from './workflow';
 import * as crt from './crt';
+import * as dibels from './dibels';
 import {
   Observable,
   Node
@@ -58,17 +59,11 @@ export async function promptHandlerFile(source, file) {
         name: 'table',
         message: 'Which table/set are you forging import data for?',
         choices: [{
-          name: 'test-results',
+          name: 'Test Results',
           value: 'Test Results'
         }, {
           name: 'U_StudentTestProficiency',
           value: 'U_StudentTestProficiency'
-        }, {
-          name: 'U_StudentTestSubscore',
-          value: 'U_StudentTestSubscore'
-        }, {
-          name: 'U_TestSubscore',
-          value: 'U_TestSubscore'
         }]
       };
 
@@ -79,7 +74,8 @@ export async function promptHandlerFile(source, file) {
         table: table.table
       };
 
-      workflow(source, promptResps, file);
+      let workflow = dibels.createWorkflow(source, promptResps, file);
+      workflow.start();
     });
   } catch (e) {
     console.error(e.stack);
