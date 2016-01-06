@@ -231,15 +231,16 @@ function proficiencyTransform(config, observable) {
 
         (s1, s2) => ({
           testResult: s2.record,
-          studentTestScore: s2.studentTestScore,
+          studentTestScore: s2.matchingTestScore,
           proficiency: s1
         })
 
       )
     })
     .filter(item => {
-      // if item.hasMatchingStudentTestScore === {}, do not emit that item
-      return !isEmpty(item.proficiency);
+      // if item.proficiency === {}, no matching proficiency records were found, so allow it through
+      // if item.proficiency is not empty, existing proficiency record was found, so do not allow it through
+      return isEmpty(item.proficiency);
     })
     .map(item => {
       return {
