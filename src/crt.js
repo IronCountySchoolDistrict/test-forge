@@ -1,13 +1,9 @@
 require('babel-polyfill');
 
+
 import {
-  getStudentIdFromSsid,
-  getStudentNumberFromSsid,
-  getTestDcid
-}
-from './service';
-import {
-  createWriteStream
+  createWriteStream,
+  truncateSync
 }
 from 'fs';
 import Promise from 'bluebird';
@@ -16,10 +12,7 @@ import {
   Observable
 }
 from '@reactivex/rxjs';
-import {
-  asyncPrependFile
-}
-from './workflow';
+
 import {
   isEmpty
 }
@@ -28,17 +21,31 @@ import {
   gustav
 }
 from 'gustav';
+
 import json2csv from 'json2csv';
-import util from 'util';
+import {
+  EOL
+}
+from 'os';
+
+import {
+  getStudentIdFromSsid,
+  getStudentNumberFromSsid,
+  getTestDcid,
+  getMatchingStudentTestScore,
+  getMatchingTests
+}
+from './service';
+
 import {
   logger
 }
 from './index';
 
 import {
-  EOL
+  printObj
 }
-from 'os';
+from './util';
 
 var toCSV = Promise.promisify(json2csv);
 
@@ -65,7 +72,7 @@ export function createWorkflow(sourceObservable) {
   return gustav.createWorkflow()
     .source('dataSource')
     .transf(transformer)
-    .transf(filterEmpty)
+    /*.transf(filterEmpty)*/
     .sink(crtCsvSink);
   // .sink(consoleNode);
 }
@@ -73,54 +80,138 @@ export function createWorkflow(sourceObservable) {
 function testResultsTransform(observer) {
   return observer
     .flatMap(item => {
+      // TODO: refactor this so it builds an object with nice helpful key names
       let asyncProps = [getStudentNumberFromSsid(item.ssid), getStudentIdFromSsid(item.ssid)];
       return Observable.zip(
 
         Observable.fromPromise(Promise.all(asyncProps))
         .catch(e => {
           logger.log('info', `Error fetching student fields for ssid: ${item.ssid}`, {
-            psDbError: util.inspect(e, {
-              showHidden: false,
-              depth: null
-            })
+            psDbError: printObj(e)
           });
           logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
-            sourceData: util.inspect(item, {
-              showHidden: false,
-              depth: null
-            })
+            sourceData: printObj(item)
           });
           return Observable.of({});
         }),
 
         Observable.of(item),
 
-        function(s1, s2) {
+        (s1, s2) => ({
+          asyncProps: s1,
+          testResult: s2
+        })
+      );
+    })
+    .filter(item => {
+      return !isEmpty(item.asyncProps);
+    })
+    .flatMap(item => {
+      console.log('in getMatchingTests flatMap');
+      let testName = toTestName(item.testResult.test_program_desc);
+
+      // Get the TEST.ID from PowerSchool that matches the test_program_desc
+      let matchingTest = getMatchingTests(testName)
+        .then(r => {
+          if (!r.rows.length === 1) {
+            throw {
+              studentTestScore: r,
+              testResult: item.testResult,
+              message: `expected getMatchingTests to return 1 record, got ${r.rows.length} rows`
+            };
+          } else {
+            return r.rows[0].ID
+          }
+        })
+      return Observable.zip(
+        Observable.of(item),
+
+        Observable.fromPromise(matchingTest)
+        .catch(e => {
+          logger.log('info', `Error finding matching test for ssid: ${item.testResult.ssid}`, {
+            psDbError: printObj(e)
+          });
+          logger.log('info', `SAMS DB Record for student_test_id: ${item.testResult.student_test_id}`, {
+            sourceData: printObj(item)
+          });
+          return Observable.of(0);
+        }),
+
+        (itemSrc, matchingTest) => {
           return {
-            asyncProps: s1,
-            testResults: s2
+            testResult: itemSrc.testResult,
+            asyncProps: itemSrc.asyncProps,
+            matchingTest: matchingTest
           };
         }
-
       );
+    })
+    .filter(item => {
+      console.log('matchingTest filter');
+      // item.matchingTest should NOT be false (0) for the item to be allowed through
+      return !!item.matchingTest;
+    })
+    .flatMap(item => {
+      let fullSchoolYear = toFullSchoolYear(item.testResult.school_year);
+      var matchingTestscore = getMatchingStudentTestScore(
+          item.asyncProps[0], // student number
+          fullSchoolYear,
+          item.testResult.test_overall_score,
+          item.matchingTest)
+        .then(r => {
+          // Expecting there to NOT be any matching student test score record,
+          // so if there is one or more, throw an exception
+          if (r.rows.length) {
+            throw {
+              studentTestScore: r,
+              testResult: item.testResult,
+              message: `expected getMatchingStudentTestScore to return 0 records, got ${r.rows.length} rows`
+            };
+          } else {
+            return {};
+          }
+        });
+
+      let matchingTestScoreObservable = Observable.fromPromise(matchingTestscore).catch(e => {
+        logger.log('info', `Error checking for matching student test records for ssid: ${item.ssid}`, {
+          psDbError: printObj(e)
+        });
+        //TODO: refactor this to use null instead of object
+        return Observable.of({});
+      });
+
+      return Observable.zip(
+        matchingTestScoreObservable,
+        Observable.of(item),
+
+        (s1, s2) => {
+          return {
+            matchingStudentTestScore: s1,
+            testResult: s2.testResult,
+            asyncProps: s2.asyncProps
+          };
+        }
+      );
+    })
+    .filter(item => {
+      // item.matchingStudentTestScore should be blank (no duplicate score in the database)
+      return isEmpty(item.matchingStudentTestScore);
     })
     .map(item => {
       if (!isEmpty(item.asyncProps)) {
         return {
-          'testResults': {
-            'Test Date': item.testResults.school_year,
+          'testResult': {
+            'Test Date': item.testResult.school_year,
             'Student Id': item.asyncProps[0],
             'Student Number': item.asyncProps[1],
-            'Grade Level': item.testResults.grade_level,
-            'Composite Score Alpha': item.testResults.test_overall_score
+            'Grade Level': item.testResult.grade_level,
+            'Composite Score Alpha': item.testResult.test_overall_score
           },
           'extra': {
-            testProgramDesc: item.testResults.test_program_desc,
-            studentTestId: item.testResults.student_test_id
+            testProgramDesc: item.testResult.test_program_desc,
+            studentTestId: item.testResult.student_test_id
           }
         };
-      } else {
-        return item;
       }
     });
 }
@@ -132,12 +223,21 @@ function transformer(observer) {
 function filterEmpty(observer) {
   return observer
     .filter(item => {
-      if (!(!isEmpty(item.testResults) && !isEmpty(item.extra))) {
+      if (!(!isEmpty(item.testResult) && !isEmpty(item.extra))) {
         blankCount++;
       }
-      let notEmpty = !isEmpty(item.testResults) && !isEmpty(item.extra);
-      return notEmpty;
+      return !isEmpty(item.testResult) && !isEmpty(item.extra);
     });
+}
+
+
+/**
+ * converts a school year in the format "2011" to "2010-2011"
+ * @param  {string|number} shortSchoolYear
+ * @return {string}
+ */
+function toFullSchoolYear(shortSchoolYear) {
+  return `${shortSchoolYear - 1}-${shortSchoolYear}`;
 }
 
 /**
@@ -145,7 +245,7 @@ function filterEmpty(observer) {
  * @param  {string} testProgramDesc PS.Test.name
  * @return {string}                 output file name
  */
-function toFileName(testProgramDesc) {
+function toTestName(testProgramDesc) {
   if (testProgramDesc.indexOf('Grade Language Arts') !== -1) {
     return 'EOL - Language Arts';
   } else if (testProgramDesc.indexOf('Grade Science') !== -1) {
@@ -204,17 +304,25 @@ function consoleNode(observer) {
 
 function crtCsvSink(observer) {
   return observer
-    .groupBy(x => toFileName(x.extra.testProgramDesc))
+    .groupBy(x => toTestName(x.extra.testProgramDesc))
     .subscribe(groupedObservable => {
 
       let ws;
-      toCsvObservable(groupedObservable).subscribe(item => {
-        if (!ws && item.ws) {
-          ws = item.ws;
-        }
-        ws.write(item.csv);
-      });
+      toCsvObservable(groupedObservable).subscribe(
+        item => {
+          if (!ws && item.ws) {
+            ws = item.ws;
+          }
+          ws.write(item.csv);
+        },
 
+        error => console.log('error == ', error),
+
+        () => {
+          console.log('end of sub');
+          ws.end();
+        }
+      );
     });
 }
 
@@ -229,39 +337,69 @@ function crtCsvSink(observer) {
  *     		}
  */
 function toCsvObservable(srcObservable) {
-  return srcObservable.concatMap(async function(item, i) {
+  return srcObservable.concatMap(function(item, i) {
     if (i === 0) {
-      let outputFilename = `output/${toFileName(item.extra.testProgramDesc)}.txt`;
+      console.log('getting outputFilename');
+      let outputFilename = `output/${toTestName(item.extra.testProgramDesc)}.txt`;
 
       // creates file if it doesn't exist
       var ws = createWriteStream(outputFilename, {
         flags: 'a'
       });
+      console.log(`created write stream for ${outputFilename}`);
 
-      await fs.truncate(outputFilename);
+      try {
+        ws.on('open', function(fd) {
+          truncateSync(outputFilename);
+        });
+      } catch (e) {
+        console.log('couldnt truncate file');
+        console.log('e == %j', e);
+      }
+
+      return toCSV({
+          data: item.testResult,
+          del: '\t',
+          hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
+        })
+        .then(csvStr => {
+          let csvRemQuotes = csvStr.replace(/"/g, '');
+
+          // Add a newline character before every line except the first line
+          let csvVal = i === 0 ? csvRemQuotes : EOL + csvRemQuotes;
+          if (ws) {
+            return {
+              csv: csvVal,
+              ws: ws
+            };
+          } else {
+            return {
+              csv: csvVal
+            };
+          }
+        });
+    } else {
+      return toCSV({
+          data: item.testResult,
+          del: '\t',
+          hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
+        })
+        .then(csvStr => {
+          let csvRemQuotes = csvStr.replace(/"/g, '');
+
+          // Add a newline character before every line except the first line
+          let csvVal = i === 0 ? csvRemQuotes : EOL + csvRemQuotes;
+          if (ws) {
+            return {
+              csv: csvVal,
+              ws: ws
+            };
+          } else {
+            return {
+              csv: csvVal
+            };
+          }
+        });
     }
-
-    return toCSV({
-        data: item.testResults,
-        del: '\t',
-        hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
-      })
-      .then(csvStr => {
-        let csvRemQuotes = csvStr.replace(/"/g, '');
-
-        // Add a newline character before every line except the first line
-        let csvVal = i === 0 ? csvRemQuotes : EOL + csvRemQuotes;
-
-        if (ws) {
-          return {
-            csv: csvVal,
-            ws: ws
-          };
-        } else {
-          return {
-            csv: csvVal
-          };
-        }
-      });
   });
 }

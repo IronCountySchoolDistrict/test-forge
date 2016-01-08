@@ -141,7 +141,6 @@ export function getStudentIdFromStudentNumber(studentNumber) {
 }
 
 export function getStudentIdFromSsid(ssid) {
-  console.log('in getStudentIdFromSsid');
   return execute(`
     SELECT ID
     FROM students
@@ -172,7 +171,6 @@ export function getStudentIdFromSsid(ssid) {
 }
 
 export function getStudentNumberFromSsid(ssid) {
-  console.log('in getStudentNumberFromSsid');
   return execute(`
     SELECT STUDENT_NUMBER
     FROM students
