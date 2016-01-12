@@ -37,9 +37,13 @@ import {
 from './index';
 import util from 'util';
 import {
-  isEmpty
+  isEmpty, merge
 }
 from 'lodash';
+import {
+  printObj
+}
+from './util';
 
 var toCSV = Promise.promisify(json2csv);
 
@@ -58,88 +62,77 @@ export function createWorkflow(sourceObservable, prompt, file) {
 function testResultsTransform(config, observable) {
   return observable
     .flatMap(item => {
-      return Observable.zip(
-        Observable.of(item),
+      const configFile = fs.readFile('./config.json')
+        .then(r => JSON.parse(r.toString()))
 
-        Observable.fromPromise(fs.readFile('./config.json')),
 
-        (s1, s2) => {
-          return {
-            testResult: s1,
-            config: JSON.parse(s2.toString())
-          };
-        }
-      )
-    })
-    .flatMap(item => {
-      // Check for matchning student test score.
-      let matchingTestScore = getMatchingStudentTestScore(
-          item.testResult['Student Primary ID'],
-          item.testResult['School Year'],
-          item.testResult['Composite Score'],
+      const matchingTestScore = getMatchingStudentTestScore(
+          item['Student Primary ID'],
+          item['School Year'],
+          item['Composite Score'],
           config.prompt.testId
         )
         .then(r => {
           // Expecting there to NOT be any matching student test score Record
           if (r.rows.length) {
-            throw {
+            const error = {
               studentTestScore: r,
               testResult: item.testResult,
               message: `expected getMatchingStudentTestScore to return 0 records, got ${r.rows.length} rows`
             };
+
+            logger.log('info', `Error checking for matching student test records for student_number: ${item['Student Primary ID']}`, {
+              psDbError: printObj(error)
+            });
+
+            return new Error(error.message);
           } else {
-            return false;
+            return {};
           }
         });
 
-      let matchingTestScoreObservable = Observable.fromPromise(
-        matchingTestScore
-      ).catch(e => {
-        logger.log('info', `Error checking for matching student test records for student_number: ${item['Student Primary ID']}`, {
-          psDbError: util.inspect(e, {
-            showHidden: false,
-            depth: null
-          })
-        });
-        return Observable.of({});
-      });
+      const studentId = getStudentIdFromStudentNumber(item['Student Primary ID'])
 
-      return Observable.zip(
-        matchingTestScoreObservable,
-        Observable.of(item),
-
-        (s1, s2) => {
+      const allPromises = Promise.all([configFile, matchingTestScore, studentId])
+        .then(r => {
           return {
-            hasMatchingStudentTestScore: s1,
-            testResult: s2.testResult,
-            config: s2.config
-          };
-        }
-      );
+            config: r[0],
+            matchingTestScore: r[1],
+            studentId: r[2]
+          }
+        });
+
+      const promisesObs = Observable.fromPromise(allPromises);
+
+      const zipFn = (s1, s2) => {
+        console.log('s1 == %j', s1);
+        console.log('s2 == %j', s2);
+        return {
+          testResult: s1,
+          config: s2.config,
+          matchingTestScore: s2.matchingTestScore,
+          studentId: s2.studentId
+        };
+      }
+
+      let testResultObs = {testResult: item};
+
+      return Observable.zip(testResultObs, promisesObs, _.merge);
 
     })
     .filter(item => {
-      // if item.hasMatchingStudentTestScore === {}, do not emit that item
-      return !isEmpty(item.hasMatchingStudentTestScore);
+      return isEmpty(item.matchingStudentTestScore) &&
+        !isEmpty(item.config) &&
+        !!item.studentId;
     })
-    .flatMap(item => {
-      console.log('flatMap item == %j', item);
-      return Observable.zip(
-
-        Observable.fromPromise(
-          getStudentIdFromStudentNumber(item.testResult['Student Primary ID'])
-        ),
-
-        Observable.of(item),
-
-        (s1, s2) => ({
-          'Test Date': s2.config.testConstants.ROGL_Begin_Year.testDate,
-          'Student Id': s1,
-          'Student Number': s2.testResult['Student Primary ID'],
-          'Grade Level': s2.testResult.Grade,
-          'Composite Score Alpha': s2.testResult['Composite Score']
-        })
-      );
+    .map(item => {
+      return {
+        'Test Date': item.config.testConstants.ROGL_Begin_Year.testDate,
+        'Student Id': item.studentId,
+        'Student Number': item.testResult['Student Primary ID'],
+        'Grade Level': item.testResult.Grade,
+        'Composite Score Alpha': item.testResult['Composite Score']
+      }
     });
 
 }
@@ -147,7 +140,7 @@ function testResultsTransform(config, observable) {
 function proficiencyTransform(config, observable) {
   return observable
     .flatMap(item => {
-      let matchingTestScore = getMatchingStudentTestScore(
+      const matchingTestScore = getMatchingStudentTestScore(
           item['Student Primary ID'],
           item['School Year'],
           item['Composite Score'],
@@ -170,16 +163,10 @@ function proficiencyTransform(config, observable) {
         Observable.fromPromise(matchingTestScore)
         .catch(e => {
           logger.log('info', `Error fetching matching student test score for student_number: ${item['Student Primary ID']}`, {
-            psDbError: util.inspect(e, {
-              showHidden: false,
-              depth: null
-            })
+            psDbError: printObj(e)
           });
           logger.log('info', `dibels record for student_number: ${item['Student Primary ID']}`, {
-            sourceData: util.inspect(item, {
-              showHidden: false,
-              depth: null
-            })
+            sourceData: printObj(item)
           });
         }),
 
@@ -213,16 +200,10 @@ function proficiencyTransform(config, observable) {
         Observable.fromPromise(matchingProficiency)
         .catch(e => {
           logger.log('info', `Error fetching matching student proficiency record for student_number: ${item['Student Primary ID']}`, {
-            psDbError: util.inspect(e, {
-              showHidden: false,
-              depth: null
-            })
+            psDbError: printObj(e)
           });
           logger.log('info', `dibels record for student_number: ${item['Student Primary ID']}`, {
-            sourceData: util.inspect(item, {
-              showHidden: false,
-              depth: null
-            })
+            sourceData: printObj(item)
           });
           return Observable.of({});
         }),
@@ -256,7 +237,6 @@ function proficiencyTransform(config, observable) {
  */
 function createTransformer(config, sourceObservable) {
   if (config.prompt.table === 'Test Results') {
-    console.log('creating test Results');
     return testResultsTransform(config, sourceObservable);
   } else if (config.prompt.table === 'U_StudentTestProficiency') {
     return proficiencyTransform(config, sourceObservable);

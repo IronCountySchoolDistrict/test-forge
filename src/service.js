@@ -94,13 +94,19 @@ export function getMatchingProficiency(studentNumber, termName, alphaScore, test
  * @return {[type]}            [description]
  */
 export function getMatchingTests(searchTerm) {
+  let random = Math.random()*100;
+  console.time(random);
   return execute(`
     SELECT id, name
     FROM test
     WHERE name LIKE '%'||:searchTerm||'%'
     `, [searchTerm], {
     outFormat: orawrap.OBJECT
-  });
+  })
+    .then(r => {
+      console.time(random);
+      return r;
+    });
 }
 
 export function getTestDcid(testId) {
@@ -203,12 +209,39 @@ export function getStudentNumberFromSsid(ssid) {
 
 export function getCrtTestResults() {
   return msExecute(`
-    SELECT
+    SELECT top 100
       [student_test].student_test_id,
       [student_test].school_year,
       [student_master].ssid,
       [student_enrollment].grade_level,
       [student_test].test_overall_score,
+      [test_program].test_program_desc
+    FROM [student_test]
+      INNER JOIN [student_enrollment]
+        ON [student_test].[student_id] = [student_enrollment].[student_id]
+           AND [student_test].school_year = [student_enrollment].school_year
+           AND [student_test].school_number = [student_enrollment].school_number
+      INNER JOIN [student_master]
+        ON [student_test].[student_id] = [student_master].[student_id]
+      INNER JOIN [test_program]
+        ON [student_test].[test_prog_id] = [test_program].[test_prog_id]
+        AND [student_test].test_overall_score != 0
+        AND [student_test].test_overall_score is not null
+
+      WHERE [student_enrollment].district_id=635
+      ORDER BY [student_master].ssid DESC
+  `);
+}
+
+export function getCrtProficiency() {
+  return msExecute(`
+    SELECT top 10
+      [student_test].student_test_id,
+      [student_test].school_year,
+      [student_master].ssid,
+      [student_enrollment].grade_level,
+      [student_test].test_overall_score,
+      [student_test].profiency,
       [test_program].test_program_desc
     FROM [student_test]
       INNER JOIN [student_enrollment]

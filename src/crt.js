@@ -66,14 +66,18 @@ async function asyncExec(command) {
   });
 }
 
-export function createWorkflow(sourceObservable) {
+export function createWorkflow(sourceObservable, prompt) {
+  var config = {
+    prompt: prompt
+  };
+
   gustav.source('dataSource', () => sourceObservable);
 
   return gustav.createWorkflow()
     .source('dataSource')
-    .transf(transformer)
+    .transf(transformer, config)
     /*.transf(filterEmpty)*/
-    .sink(crtCsvSink);
+    .sink(crtCsvSink, config);
   // .sink(consoleNode);
 }
 
@@ -107,7 +111,6 @@ function testResultsTransform(observer) {
       return !isEmpty(item.asyncProps);
     })
     .flatMap(item => {
-      console.log('in getMatchingTests flatMap');
       let testName = toTestName(item.testResult.test_program_desc);
 
       // Get the TEST.ID from PowerSchool that matches the test_program_desc
@@ -122,7 +125,8 @@ function testResultsTransform(observer) {
           } else {
             return r.rows[0].ID
           }
-        })
+        });
+
       return Observable.zip(
         Observable.of(item),
 
@@ -147,13 +151,12 @@ function testResultsTransform(observer) {
       );
     })
     .filter(item => {
-      console.log('matchingTest filter');
       // item.matchingTest should NOT be false (0) for the item to be allowed through
       return !!item.matchingTest;
     })
     .flatMap(item => {
       let fullSchoolYear = toFullSchoolYear(item.testResult.school_year);
-      var matchingTestscore = getMatchingStudentTestScore(
+      let matchingTestscore = getMatchingStudentTestScore(
           item.asyncProps[0], // student number
           fullSchoolYear,
           item.testResult.test_overall_score,
@@ -200,7 +203,7 @@ function testResultsTransform(observer) {
     .map(item => {
       if (!isEmpty(item.asyncProps)) {
         return {
-          'testResult': {
+          'csvOutput': {
             'Test Date': item.testResult.school_year,
             'Student Id': item.asyncProps[0],
             'Student Number': item.asyncProps[1],
@@ -216,8 +219,154 @@ function testResultsTransform(observer) {
     });
 }
 
-function transformer(observer) {
-  return testResultsTransform(observer);
+// TODO: refactor these flatMaps to combine all independent
+// promises to be settled within the same flatMap
+function proficiencyTransform(observer) {
+  return observer
+    .flatMap(item => {
+      // TODO: refactor this so it builds an object with nice helpful key names
+      let asyncProps = [getStudentNumberFromSsid(item.ssid), getStudentIdFromSsid(item.ssid)];
+      return Observable.zip(
+
+        Observable.fromPromise(Promise.all(asyncProps))
+        .catch(e => {
+          logger.log('info', `Error fetching student fields for ssid: ${item.ssid}`, {
+            psDbError: printObj(e)
+          });
+          logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
+            sourceData: printObj(item)
+          });
+          return Observable.of({});
+        }),
+
+        Observable.of(item),
+
+        (s1, s2) => ({
+          asyncProps: s1,
+          proficiency: s2
+        })
+      );
+    })
+    .filter(item => {
+      console.log('item == %j', item);
+      return !isEmpty(item.asyncProps);
+    })
+    .flatMap(item => {
+      let testName = toTestName(item.proficiency.test_program_desc);
+
+      // Get the TEST.ID from PowerSchool that matches the test_program_desc
+      let matchingTest = getMatchingTests(testName)
+        .then(r => {
+          if (!r.rows.length === 1) {
+            throw {
+              studentTestScore: r,
+              proficiency: item.proficiency,
+              message: `expected getMatchingTests to return 1 record, got ${r.rows.length} rows`
+            };
+          } else {
+            return r.rows[0].ID
+          }
+        });
+
+      return Observable.zip(
+        Observable.of(item),
+
+        Observable.fromPromise(matchingTest)
+        .catch(e => {
+          logger.log('info', `Error finding matching test for ssid: ${item.proficiency.ssid}`, {
+            psDbError: printObj(e)
+          });
+          logger.log('info', `SAMS DB Record for student_test_id: ${item.proficiency.student_test_id}`, {
+            sourceData: printObj(item)
+          });
+          return Observable.of(0);
+        }),
+
+        (itemSrc, matchingTest) => {
+          return {
+            proficiency: itemSrc.proficiency,
+            asyncProps: itemSrc.asyncProps,
+            matchingTest: matchingTest
+          };
+        }
+      );
+    })
+    .filter(item => {
+      console.log('item == %j', item);
+      // item.matchingTest should NOT be false (0) for the item to be allowed through
+      return !!item.matchingTest;
+    })
+    .flatMap(item => {
+      let fullSchoolYear = toFullSchoolYear(item.proficiency.school_year);
+      let matchingTestscore = getMatchingStudentTestScore(
+          item.asyncProps[0], // student number
+          fullSchoolYear,
+          item.proficiency.test_overall_score,
+          item.matchingTest)
+        .then(r => {
+          // Expecting there to NOT be any matching student test score record,
+          // so if there is one or more, throw an exception
+          if (!r.rows.length) {
+            throw {
+              studentTestScore: r,
+              testResult: item.testResult,
+              message: `expected getMatchingStudentTestScore to return 1 records, got ${r.rows.length} rows`
+            };
+          } else {
+            return r.rows;
+          }
+        });
+
+      let matchingTestScoreObservable = Observable.fromPromise(matchingTestscore).catch(e => {
+        logger.log('info', `Error searching for matching student test records for ssid: ${item.proficiency.ssid}`, {
+          psDbError: printObj(e)
+        });
+        //TODO: refactor this to use null instead of object
+        return Observable.of({});
+      });
+
+      return Observable.zip(
+        matchingTestScoreObservable,
+        Observable.of(item),
+
+        (s1, s2) => {
+          return {
+            studentTestScore: s1,
+            proficiency: s2.proficiency,
+            asyncProps: s2.asyncProps
+          };
+        }
+      );
+    })
+    .filter(item => {
+      console.log('filter item == %j', item);
+      // item.matchingStudentTestScore should be blank (no duplicate score in the database)
+      return !isEmpty(item.studentTestScore);
+    })
+    .map(item => {
+      console.log('item == %j', item);
+      if (!isEmpty(item.asyncProps)) {
+        return {
+          csvOutput: {
+            studentTestScoreDcid: item.studentTestScore,
+            benchmark: item.testResult.proficiency
+          },
+          extra: {
+            testProgramDesc: item.testResult.test_program_desc,
+            studentTestId: item.testResult.student_test_id
+          }
+        };
+      }
+    });
+}
+
+function transformer(config, observer) {
+  if (config.prompt.table === 'Test Results') {
+    return testResultsTransform(observer);
+  }
+  if (config.prompt.table === 'U_StudentTestProficiency') {
+    return proficiencyTransform(observer);
+  }
 }
 
 function filterEmpty(observer) {
@@ -302,13 +451,13 @@ function consoleNode(observer) {
   });
 }
 
-function crtCsvSink(observer) {
-  return observer
+function crtCsvSink(config, observable) {
+  return observable
     .groupBy(x => toTestName(x.extra.testProgramDesc))
     .subscribe(groupedObservable => {
 
       let ws;
-      toCsvObservable(groupedObservable).subscribe(
+      toCsvObservable(config, groupedObservable).subscribe(
         item => {
           if (!ws && item.ws) {
             ws = item.ws;
@@ -319,7 +468,6 @@ function crtCsvSink(observer) {
         error => console.log('error == ', error),
 
         () => {
-          console.log('end of sub');
           ws.end();
         }
       );
@@ -336,11 +484,12 @@ function crtCsvSink(observer) {
  *         	ws: writable file stream to write results to file system
  *     		}
  */
-function toCsvObservable(srcObservable) {
+function toCsvObservable(config, srcObservable) {
+  console.log('config == %j', config);
   return srcObservable.concatMap(function(item, i) {
     if (i === 0) {
       console.log('getting outputFilename');
-      let outputFilename = `output/${toTestName(item.extra.testProgramDesc)}.txt`;
+      let outputFilename = `output/${toTestName(item.extra.testProgramDesc)}-${config.prompt.table}.txt`;
 
       // creates file if it doesn't exist
       var ws = createWriteStream(outputFilename, {
@@ -356,50 +505,28 @@ function toCsvObservable(srcObservable) {
         console.log('couldnt truncate file');
         console.log('e == %j', e);
       }
-
-      return toCSV({
-          data: item.testResult,
-          del: '\t',
-          hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
-        })
-        .then(csvStr => {
-          let csvRemQuotes = csvStr.replace(/"/g, '');
-
-          // Add a newline character before every line except the first line
-          let csvVal = i === 0 ? csvRemQuotes : EOL + csvRemQuotes;
-          if (ws) {
-            return {
-              csv: csvVal,
-              ws: ws
-            };
-          } else {
-            return {
-              csv: csvVal
-            };
-          }
-        });
-    } else {
-      return toCSV({
-          data: item.testResult,
-          del: '\t',
-          hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
-        })
-        .then(csvStr => {
-          let csvRemQuotes = csvStr.replace(/"/g, '');
-
-          // Add a newline character before every line except the first line
-          let csvVal = i === 0 ? csvRemQuotes : EOL + csvRemQuotes;
-          if (ws) {
-            return {
-              csv: csvVal,
-              ws: ws
-            };
-          } else {
-            return {
-              csv: csvVal
-            };
-          }
-        });
     }
+    return toCSV({
+        data: item.csvOutput,
+        del: '\t',
+        hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
+      })
+      .then(csvStr => {
+        let csvRemQuotes = csvStr.replace(/"/g, '');
+
+        // Add a newline character before every line except the first line
+        let csvVal = i === 0 ? csvRemQuotes : EOL + csvRemQuotes;
+        if (ws) {
+          return {
+            csv: csvVal,
+            ws: ws
+          };
+        } else {
+          return {
+            csv: csvVal
+          };
+        }
+      });
+
   });
 }

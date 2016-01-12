@@ -90,7 +90,7 @@ export async function promptHandlerSams(test) {
         name: 'table',
         message: 'Which table/set are you forging import data for?',
         choices: [{
-          name: 'test-results',
+          name: 'Test Results',
           value: 'Test Results'
         }, {
           name: 'U_StudentTestProficiency',
@@ -110,12 +110,8 @@ export async function promptHandlerSams(test) {
         table: table.table
       };
 
-      let source;
-      if (promptResps.table === 'Test Results') {
-        // create Test Results SAMS Observable
-        source = await getCrtTestResults();
-      }
-      let workflow = crt.createWorkflow(source);
+      let source = await getCrtTestResults();
+      let workflow = crt.createWorkflow(source, promptResps);
       workflow.start();
   } catch (e) {
     console.error(e.stack);
