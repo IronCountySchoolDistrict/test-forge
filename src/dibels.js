@@ -115,7 +115,9 @@ function testResultsTransform(config, observable) {
         };
       }
 
-      let testResultObs = {testResult: item};
+      let testResultObs = {
+        testResult: item
+      };
 
       return Observable.zip(testResultObs, promisesObs, _.merge);
 

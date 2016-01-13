@@ -13,5 +13,10 @@ export default function detect(csvData) {
       type: 'dibels',
       name: 'ROGL'
     };
+  } else if (csvData['AssessmentSeriesCode'] === 'SAGE') {
+    return {
+      type: 'SAGE',
+      name: 'SAGE'
+    }
   }
 }

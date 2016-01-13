@@ -43,14 +43,16 @@ export function getMatchingStudentTest(studentNumber, termName, testId) {
  * if exactly one match is found. If zero matches, or more than match,
  * is found, reject with an error message.
  */
-export function getMatchingStudentTestScore(studentNumber, termName, alphaScore, testId) {
+export function getMatchingStudentTestScore(studentNumber, termName, score, testId) {
   return execute(`
     SELECT studenttestscore.dcid
     FROM studenttestscore
       JOIN studenttest ON studenttest.id = STUDENTTESTSCORE.STUDENTTESTID
       JOIN students on studenttest.STUDENTID=students.id
     WHERE students.student_number = :student_number
-          AND studenttestscore.alphascore=:alpha_score
+          AND (studenttestscore.alphascore = :score OR
+               studenttestscore.numscore = :score OR
+               studenttestscore.percentscore = :score)
           AND studenttest.termid IN
               (
                 SELECT DISTINCT id
@@ -60,7 +62,12 @@ export function getMatchingStudentTestScore(studentNumber, termName, alphaScore,
                                 WHERE name = :term_name)
               )
           AND studenttest.testid = :test_id
-    `, [studentNumber, alphaScore, termName, testId], {
+    `, {
+    student_number: studentNumber,
+    score: score,
+    term_name: termName,
+    test_id: testId
+  }, {
     outFormat: orawrap.OBJECT
   });
 }
@@ -94,19 +101,13 @@ export function getMatchingProficiency(studentNumber, termName, alphaScore, test
  * @return {[type]}            [description]
  */
 export function getMatchingTests(searchTerm) {
-  let random = Math.random()*100;
-  console.time(random);
   return execute(`
     SELECT id, name
     FROM test
     WHERE name LIKE '%'||:searchTerm||'%'
     `, [searchTerm], {
     outFormat: orawrap.OBJECT
-  })
-    .then(r => {
-      console.time(random);
-      return r;
-    });
+  });
 }
 
 export function getTestDcid(testId) {
@@ -209,7 +210,7 @@ export function getStudentNumberFromSsid(ssid) {
 
 export function getCrtTestResults() {
   return msExecute(`
-    SELECT top 100
+    SELECT top 10
       [student_test].student_test_id,
       [student_test].school_year,
       [student_master].ssid,
@@ -228,7 +229,7 @@ export function getCrtTestResults() {
         AND [student_test].test_overall_score != 0
         AND [student_test].test_overall_score is not null
 
-      WHERE [student_enrollment].district_id=635
+      --WHERE [student_enrollment].district_id=635
       ORDER BY [student_master].ssid DESC
   `);
 }
@@ -241,7 +242,7 @@ export function getCrtProficiency() {
       [student_master].ssid,
       [student_enrollment].grade_level,
       [student_test].test_overall_score,
-      [student_test].profiency,
+      [student_test].proficiency,
       [test_program].test_program_desc
     FROM [student_test]
       INNER JOIN [student_enrollment]
@@ -255,7 +256,7 @@ export function getCrtProficiency() {
         AND [student_test].test_overall_score != 0
         AND [student_test].test_overall_score is not null
 
-      WHERE [student_enrollment].district_id=635
+      --WHERE [student_enrollment].district_id=635
       ORDER BY [student_master].ssid DESC
   `);
 }

@@ -83,54 +83,51 @@ export function createWorkflow(sourceObservable, prompt) {
 
 function testResultsTransform(observer) {
   return observer
+    .map(item => {
+      // If test_program_desc is spelled wrong, replace that value with the correctly spelled value
+      item.test_program_desc = item.test_program_desc === 'Earth Sytems Science' ? 'Earth Systems Science' : item.test_program_desc
+      return item;
+    })
+    .map(item => {
+      item.test_date = new Date(`05/01/${item.school_year}`).toLocaleDateString();
+      return item;
+    })
     .flatMap(item => {
-      // TODO: refactor this so it builds an object with nice helpful key names
-      let asyncProps = [getStudentNumberFromSsid(item.ssid), getStudentIdFromSsid(item.ssid)];
-      return Observable.zip(
 
-        Observable.fromPromise(Promise.all(asyncProps))
+      let studentNumberObs = Observable.fromPromise(getStudentNumberFromSsid(item.ssid))
         .catch(e => {
-          logger.log('info', `Error fetching student fields for ssid: ${item.ssid}`, {
+          logger.log('info', `Error fetching student number for ssid: ${item.ssid}`, {
             psDbError: printObj(e)
           });
           logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
             sourceData: printObj(item)
           });
           return Observable.of({});
-        }),
+        });
 
-        Observable.of(item),
+      let studentIdObs = Observable.fromPromise(getStudentIdFromSsid(item.ssid))
+        .catch(e => {
+          logger.log('info', `Error fetching student id for ssid: ${item.ssid}`, {
+            psDbError: printObj(e)
+          });
+          logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
+            sourceData: printObj(item)
+          });
+          return Observable.of({});
+        });
 
-        (s1, s2) => ({
-          asyncProps: s1,
-          testResult: s2
-        })
-      );
-    })
-    .filter(item => {
-      return !isEmpty(item.asyncProps);
-    })
-    .flatMap(item => {
-      let testName = toTestName(item.testResult.test_program_desc);
-
-      // Get the TEST.ID from PowerSchool that matches the test_program_desc
-      let matchingTest = getMatchingTests(testName)
-        .then(r => {
-          if (!r.rows.length === 1) {
+      let matchingTestsObs = Observable.fromPromise(getMatchingTests(item.test_program_desc))
+        .map(matchingTests => {
+          if (!matchingTests.rows.length === 1) {
             throw {
-              studentTestScore: r,
-              testResult: item.testResult,
+              studentTestScore: matchingTests,
+              testResult: item,
               message: `expected getMatchingTests to return 1 record, got ${r.rows.length} rows`
             };
           } else {
-            return r.rows[0].ID
+            return matchingTests.rows[0].ID
           }
-        });
-
-      return Observable.zip(
-        Observable.of(item),
-
-        Observable.fromPromise(matchingTest)
+        })
         .catch(e => {
           logger.log('info', `Error finding matching test for ssid: ${item.testResult.ssid}`, {
             psDbError: printObj(e)
@@ -139,225 +136,175 @@ function testResultsTransform(observer) {
             sourceData: printObj(item)
           });
           return Observable.of(0);
-        }),
+        })
+        .filter(matchingTest => !!matchingTest)
 
-        (itemSrc, matchingTest) => {
-          return {
-            testResult: itemSrc.testResult,
-            asyncProps: itemSrc.asyncProps,
-            matchingTest: matchingTest
-          };
-        }
+      return Observable.zip(
+        studentNumberObs,
+        studentIdObs,
+        matchingTestsObs,
+
+        (studentNumber, studentId, matchingTest) => ({
+          studentNumber: studentNumber,
+          studentId: studentId,
+          matchingTestId: matchingTest,
+          testResult: item
+        })
       );
-    })
-    .filter(item => {
-      // item.matchingTest should NOT be false (0) for the item to be allowed through
-      return !!item.matchingTest;
     })
     .flatMap(item => {
       let fullSchoolYear = toFullSchoolYear(item.testResult.school_year);
-      let matchingTestscore = getMatchingStudentTestScore(
-          item.asyncProps[0], // student number
+      let matchingTestScore = getMatchingStudentTestScore(
+          item.studentNumber,
           fullSchoolYear,
           item.testResult.test_overall_score,
-          item.matchingTest)
+          item.matchingTestId)
         .then(r => {
           // Expecting there to NOT be any matching student test score record,
           // so if there is one or more, throw an exception
           if (r.rows.length) {
-            throw {
+            const error = {
               studentTestScore: r,
               testResult: item.testResult,
               message: `expected getMatchingStudentTestScore to return 0 records, got ${r.rows.length} rows`
             };
+
+            logger.log('info', `Error checking for matching student test records for ssid: ${item.ssid}`, {
+              psDbError: printObj(error)
+            });
           } else {
-            return {};
+            return null;
           }
         });
 
-      let matchingTestScoreObservable = Observable.fromPromise(matchingTestscore).catch(e => {
-        logger.log('info', `Error checking for matching student test records for ssid: ${item.ssid}`, {
-          psDbError: printObj(e)
-        });
-        //TODO: refactor this to use null instead of object
-        return Observable.of({});
-      });
-
-      return Observable.zip(
-        matchingTestScoreObservable,
-        Observable.of(item),
-
-        (s1, s2) => {
+      return Observable.fromPromise(matchingTestScore)
+        .filter(r => !r)
+        .map(_ => {
           return {
-            matchingStudentTestScore: s1,
-            testResult: s2.testResult,
-            asyncProps: s2.asyncProps
+            'csvOutput': {
+              'Test Date': item.testResult.test_date,
+              'Student Id': item.studentId,
+              'Student Number': item.studentNumber,
+              'Grade Level': item.testResult.grade_level,
+              'Composite Score Alpha': item.testResult.test_overall_score
+            },
+            'extra': {
+              testProgramDesc: item.testResult.test_program_desc,
+              studentTestId: item.testResult.student_test_id
+            }
           };
-        }
-      );
+        })
     })
-    .filter(item => {
-      // item.matchingStudentTestScore should be blank (no duplicate score in the database)
-      return isEmpty(item.matchingStudentTestScore);
-    })
-    .map(item => {
-      if (!isEmpty(item.asyncProps)) {
-        return {
-          'csvOutput': {
-            'Test Date': item.testResult.school_year,
-            'Student Id': item.asyncProps[0],
-            'Student Number': item.asyncProps[1],
-            'Grade Level': item.testResult.grade_level,
-            'Composite Score Alpha': item.testResult.test_overall_score
-          },
-          'extra': {
-            testProgramDesc: item.testResult.test_program_desc,
-            studentTestId: item.testResult.student_test_id
-          }
-        };
-      }
-    });
 }
 
-// TODO: refactor these flatMaps to combine all independent
-// promises to be settled within the same flatMap
 function proficiencyTransform(observer) {
   return observer
+    .map(item => {
+      // If test_program_desc is spelled wrong, replace that value with the correctly spelled value
+      item.test_program_desc = item.test_program_desc === 'Earth Sytems Science' ? 'Earth Systems Science' : item.test_program_desc
+      return item;
+    })
     .flatMap(item => {
-      // TODO: refactor this so it builds an object with nice helpful key names
-      let asyncProps = [getStudentNumberFromSsid(item.ssid), getStudentIdFromSsid(item.ssid)];
-      return Observable.zip(
 
-        Observable.fromPromise(Promise.all(asyncProps))
+      let studentNumberObs = Observable.fromPromise(getStudentNumberFromSsid(item.ssid))
         .catch(e => {
-          logger.log('info', `Error fetching student fields for ssid: ${item.ssid}`, {
+          logger.log('info', `Error fetching student number for ssid: ${item.ssid}`, {
             psDbError: printObj(e)
           });
           logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
             sourceData: printObj(item)
           });
           return Observable.of({});
-        }),
+        });
 
-        Observable.of(item),
+      let studentIdObs = Observable.fromPromise(getStudentIdFromSsid(item.ssid))
+        .catch(e => {
+          logger.log('info', `Error fetching student id for ssid: ${item.ssid}`, {
+            psDbError: printObj(e)
+          });
+          logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
+            sourceData: printObj(item)
+          });
+          return Observable.of({});
+        });
 
-        (s1, s2) => ({
-          asyncProps: s1,
-          proficiency: s2
-        })
-      );
-    })
-    .filter(item => {
-      console.log('item == %j', item);
-      return !isEmpty(item.asyncProps);
-    })
-    .flatMap(item => {
-      let testName = toTestName(item.proficiency.test_program_desc);
-
-      // Get the TEST.ID from PowerSchool that matches the test_program_desc
-      let matchingTest = getMatchingTests(testName)
-        .then(r => {
-          if (!r.rows.length === 1) {
+      let matchingTestsObs = Observable.fromPromise(getMatchingTests(item.test_program_desc))
+        .map(matchingTests => {
+          if (!matchingTests.rows.length === 1) {
             throw {
-              studentTestScore: r,
-              proficiency: item.proficiency,
+              studentTestScore: matchingTests,
+              testResult: item,
               message: `expected getMatchingTests to return 1 record, got ${r.rows.length} rows`
             };
           } else {
-            return r.rows[0].ID
+            return matchingTests.rows[0].ID
           }
-        });
-
-      return Observable.zip(
-        Observable.of(item),
-
-        Observable.fromPromise(matchingTest)
+        })
         .catch(e => {
-          logger.log('info', `Error finding matching test for ssid: ${item.proficiency.ssid}`, {
+          logger.log('info', `Error finding matching test for ssid: ${item.testResult.ssid}`, {
             psDbError: printObj(e)
           });
-          logger.log('info', `SAMS DB Record for student_test_id: ${item.proficiency.student_test_id}`, {
+          logger.log('info', `SAMS DB Record for student_test_id: ${item.testResult.student_test_id}`, {
             sourceData: printObj(item)
           });
           return Observable.of(0);
-        }),
+        })
+        .filter(matchingTest => !!matchingTest)
 
-        (itemSrc, matchingTest) => {
-          return {
-            proficiency: itemSrc.proficiency,
-            asyncProps: itemSrc.asyncProps,
-            matchingTest: matchingTest
-          };
-        }
+      return Observable.zip(
+        studentNumberObs,
+        studentIdObs,
+        matchingTestsObs,
+
+        (studentNumber, studentId, matchingTest) => ({
+          studentNumber: studentNumber,
+          studentId: studentId,
+          matchingTestId: matchingTest,
+          testResult: item
+        })
       );
     })
-    .filter(item => {
-      console.log('item == %j', item);
-      // item.matchingTest should NOT be false (0) for the item to be allowed through
-      return !!item.matchingTest;
-    })
     .flatMap(item => {
-      let fullSchoolYear = toFullSchoolYear(item.proficiency.school_year);
-      let matchingTestscore = getMatchingStudentTestScore(
-          item.asyncProps[0], // student number
+
+      let fullSchoolYear = toFullSchoolYear(item.testResult.school_year);
+      let matchingTestScore = getMatchingStudentTestScore(
+          item.studentNumber,
           fullSchoolYear,
-          item.proficiency.test_overall_score,
-          item.matchingTest)
+          item.testResult.test_overall_score,
+          item.matchingTestId)
         .then(r => {
           // Expecting there to NOT be any matching student test score record,
           // so if there is one or more, throw an exception
           if (!r.rows.length) {
-            throw {
+            const error = {
               studentTestScore: r,
               testResult: item.testResult,
               message: `expected getMatchingStudentTestScore to return 1 records, got ${r.rows.length} rows`
             };
+
+            logger.log('info', `Error checking for matching student test records for ssid: ${item.ssid}`, {
+              psDbError: printObj(error)
+            });
           } else {
-            return r.rows;
+            return r.rows[0].DCID;
           }
         });
 
-      let matchingTestScoreObservable = Observable.fromPromise(matchingTestscore).catch(e => {
-        logger.log('info', `Error searching for matching student test records for ssid: ${item.proficiency.ssid}`, {
-          psDbError: printObj(e)
-        });
-        //TODO: refactor this to use null instead of object
-        return Observable.of({});
-      });
-
-      return Observable.zip(
-        matchingTestScoreObservable,
-        Observable.of(item),
-
-        (s1, s2) => {
+      return Observable.fromPromise(matchingTestScore)
+        .filter(r => !!r)
+        .map(matchingTestScoreDcid => {
           return {
-            studentTestScore: s1,
-            proficiency: s2.proficiency,
-            asyncProps: s2.asyncProps
+            csvOutput: {
+              studentTestScoreDcid: matchingTestScoreDcid,
+              benchmark: item.testResult.proficiency
+            },
+            extra: {
+              testProgramDesc: item.testResult.test_program_desc,
+              studentTestId: item.testResult.student_test_id
+            }
           };
-        }
-      );
+        });
     })
-    .filter(item => {
-      console.log('filter item == %j', item);
-      // item.matchingStudentTestScore should be blank (no duplicate score in the database)
-      return !isEmpty(item.studentTestScore);
-    })
-    .map(item => {
-      console.log('item == %j', item);
-      if (!isEmpty(item.asyncProps)) {
-        return {
-          csvOutput: {
-            studentTestScoreDcid: item.studentTestScore,
-            benchmark: item.testResult.proficiency
-          },
-          extra: {
-            testProgramDesc: item.testResult.test_program_desc,
-            studentTestId: item.testResult.student_test_id
-          }
-        };
-      }
-    });
 }
 
 function transformer(config, observer) {
@@ -389,60 +336,6 @@ function toFullSchoolYear(shortSchoolYear) {
   return `${shortSchoolYear - 1}-${shortSchoolYear}`;
 }
 
-/**
- * converts a test_program_desc value to a PS.Test.name value
- * @param  {string} testProgramDesc PS.Test.name
- * @return {string}                 output file name
- */
-function toTestName(testProgramDesc) {
-  if (testProgramDesc.indexOf('Grade Language Arts') !== -1) {
-    return 'EOL - Language Arts';
-  } else if (testProgramDesc.indexOf('Grade Science') !== -1) {
-    return 'EOL - Science';
-  } else if (testProgramDesc.indexOf('Grade Math') !== -1) {
-    return 'EOL - Math';
-  } else if (testProgramDesc.indexOf('Algebra I') !== -1) {
-    return 'EOL - Algebra I';
-  } else if (testProgramDesc.indexOf('Biology') !== -1) {
-    return 'EOL - Biology';
-  } else if (testProgramDesc.indexOf('UAA Math') !== -1) {
-    return 'EOL - UAA Math';
-  } else if (testProgramDesc.indexOf('UAA Language') !== -1) {
-    return 'EOL - UAA Language';
-  } else if (testProgramDesc.indexOf('UAA Science') !== -1) {
-    return 'EOL - UAA Science';
-  } else if (testProgramDesc.indexOf('Earth Systems Science') !== -1 ||
-    testProgramDesc.indexOf('Earth Sytems Science') !== -1) {
-    return 'EOL - Earth Systems Science';
-  } else if (testProgramDesc.indexOf('6th Grade Math Common Core') !== -1) {
-    return 'EOL - Math Common Core';
-  } else if (testProgramDesc.indexOf('6th Grade Math Existing Core') !== -1) {
-    return 'EOL - Math Existing Core';
-  } else if (testProgramDesc.indexOf('Direct Writing I') !== -1) {
-    return 'EOL - Direct Writing I';
-  } else if (testProgramDesc.indexOf('Direct Writing II') !== -1) {
-    return 'EOL - Direct Writing II';
-  } else if (testProgramDesc.indexOf('Direct Writing') !== -1) {
-    return 'EOL - Direct Writing';
-  } else if (testProgramDesc.indexOf('Pre-Algebra') !== -1) {
-    return 'EOL - Pre-Algebra';
-  } else if (testProgramDesc.indexOf('Algebra I') !== -1) {
-    return 'EOL - Algebra I';
-  } else if (testProgramDesc.indexOf('Algebra II') !== -1) {
-    return 'EOL - Algebra II';
-  } else if (testProgramDesc.indexOf('Geometry') !== -1) {
-    return 'EOL - Geometry';
-  } else if (testProgramDesc.indexOf('Chemistry') !== -1) {
-    return 'EOL - Chemistry';
-  } else if (testProgramDesc.indexOf('Elementary Algebra') !== -1) {
-    return 'EOL - Elementary Algebra';
-  } else if (testProgramDesc.indexOf('Physics') !== -1) {
-    return 'EOL - Physics';
-  } else {
-    return 'other';
-  }
-}
-
 function consoleNode(observer) {
   observer.subscribe(x => {
     console.log('in consoleNode');
@@ -453,7 +346,7 @@ function consoleNode(observer) {
 
 function crtCsvSink(config, observable) {
   return observable
-    .groupBy(x => toTestName(x.extra.testProgramDesc))
+    .groupBy(x => x.extra.testProgramDesc)
     .subscribe(groupedObservable => {
 
       let ws;
@@ -489,7 +382,7 @@ function toCsvObservable(config, srcObservable) {
   return srcObservable.concatMap(function(item, i) {
     if (i === 0) {
       console.log('getting outputFilename');
-      let outputFilename = `output/${toTestName(item.extra.testProgramDesc)}-${config.prompt.table}.txt`;
+      let outputFilename = `output/EOL - ${item.extra.testProgramDesc}-${config.prompt.table}.txt`;
 
       // creates file if it doesn't exist
       var ws = createWriteStream(outputFilename, {

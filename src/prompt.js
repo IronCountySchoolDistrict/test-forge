@@ -6,7 +6,8 @@ import {
 from 'inquirer';
 import {
   getMatchingTests,
-  getCrtTestResults
+  getCrtTestResults,
+  getCrtProficiency
 }
 from './service';
 import detect from './detector';
@@ -110,7 +111,13 @@ export async function promptHandlerSams(test) {
         table: table.table
       };
 
-      let source = await getCrtTestResults();
+      let source;
+      if (promptResps.table === 'Test Results') {
+        source = await getCrtTestResults();
+      } else {
+        source = await getCrtProficiency();
+      }
+
       let workflow = crt.createWorkflow(source, promptResps);
       workflow.start();
   } catch (e) {
