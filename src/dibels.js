@@ -90,9 +90,9 @@ function testResultsTransform(config, observable) {
           }
         });
 
-      const studentId = getStudentIdFromStudentNumber(item['Student Primary ID'])
+      let studentId = getStudentIdFromStudentNumber(item['Student Primary ID'])
 
-      const allPromises = Promise.all([configFile, matchingTestScore, studentId])
+      let allPromises = Promise.all([configFile, matchingTestScore, studentId])
         .then(r => {
           return {
             config: r[0],
@@ -102,7 +102,7 @@ function testResultsTransform(config, observable) {
         });
 
 
-      const promisesObs = Observable.fromPromise(allPromises);
+      let promisesObs = Observable.fromPromise(allPromises);
 
       let testResultObs = Observable.of({
         testResult: item
