@@ -65,7 +65,6 @@ function testResultsTransform(config, observable) {
       const configFile = fs.readFile('./config.json')
         .then(r => JSON.parse(r.toString()))
 
-
       const matchingTestScore = getMatchingStudentTestScore(
           item['Student Primary ID'],
           item['School Year'],
@@ -85,7 +84,7 @@ function testResultsTransform(config, observable) {
               psDbError: printObj(error)
             });
 
-            return new Error(error.message);
+            return r.rows;
           } else {
             return {};
           }
@@ -102,28 +101,23 @@ function testResultsTransform(config, observable) {
           }
         });
 
+
       const promisesObs = Observable.fromPromise(allPromises);
 
-      const zipFn = (s1, s2) => {
-        console.log('s1 == %j', s1);
-        console.log('s2 == %j', s2);
-        return {
-          testResult: s1,
-          config: s2.config,
-          matchingTestScore: s2.matchingTestScore,
-          studentId: s2.studentId
-        };
-      }
-
-      let testResultObs = {
+      let testResultObs = Observable.of({
         testResult: item
-      };
+      });
 
-      return Observable.zip(testResultObs, promisesObs, _.merge);
+      return Observable.zip(testResultObs, promisesObs, merge);
 
     })
     .filter(item => {
-      return isEmpty(item.matchingStudentTestScore) &&
+
+      // return true (allow through filter) if the following criteria are met:
+      // 1) no matching student test score record was found
+      // 2) the config file object is not empty
+      // 3) studentId is not falsey (not found)
+      return !item.matchingTestScore.length &&
         !isEmpty(item.config) &&
         !!item.studentId;
     })
@@ -149,7 +143,7 @@ function proficiencyTransform(config, observable) {
           config.prompt.testId
         )
         .then(r => {
-          // Expecting there to NOT be any matching student test score Record
+          // Expecting there to be 1 matching student test score record
           if (!r.rows.length) {
             throw {
               studentTestScore: r,
@@ -170,6 +164,7 @@ function proficiencyTransform(config, observable) {
           logger.log('info', `dibels record for student_number: ${item['Student Primary ID']}`, {
             sourceData: printObj(item)
           });
+          return Observable.of({});
         }),
 
         Observable.of(item),
@@ -217,7 +212,6 @@ function proficiencyTransform(config, observable) {
           studentTestScore: s2.matchingTestScore,
           proficiency: s1
         })
-
       )
     })
     .filter(item => {
