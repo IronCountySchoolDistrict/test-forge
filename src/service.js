@@ -210,7 +210,7 @@ export function getStudentNumberFromSsid(ssid) {
 
 export function getCrtTestResults() {
   return msExecute(`
-    SELECT top 10
+    SELECT
       [student_test].student_test_id,
       [student_test].school_year,
       [student_master].ssid,
@@ -236,7 +236,7 @@ export function getCrtTestResults() {
 
 export function getCrtProficiency() {
   return msExecute(`
-    SELECT top 10
+    SELECT top 1
       [student_test].student_test_id,
       [student_test].school_year,
       [student_master].ssid,

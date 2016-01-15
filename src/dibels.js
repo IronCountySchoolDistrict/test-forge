@@ -1,54 +1,25 @@
 require('babel-polyfill');
 
-import {
-  getStudentIdFromStudentNumber,
-  getMatchingStudentTest,
-  getMatchingStudentTestScore,
-  getMatchingProficiency
-}
-from './service';
-import {
-  createWriteStream
-}
-from 'fs';
-
+import { createWriteStream } from 'fs';
 import fs from 'fs-promise';
-import {
-  Observable
-}
-from '@reactivex/rxjs';
+import { Observable } from '@reactivex/rxjs';
 import Promise from 'bluebird';
-import {
-  gustav
-}
-from 'gustav';
-import {
-  basename, extname
-}
-from 'path';
+import { gustav } from 'gustav';
+import { basename, extname } from 'path';
 import json2csv from 'json2csv';
-import {
-  EOL
-}
-from 'os';
-import {
-  logger
-}
-from './index';
+import { EOL } from 'os';
 import util from 'util';
-import {
-  isEmpty, merge
-}
-from 'lodash';
-import {
-  printObj
-}
-from './util';
+import { isEmpty, merge } from 'lodash';
+
+import { getStudentIdFromStudentNumber, getMatchingStudentTest, getMatchingStudentTestScore, getMatchingProficiency } from './service';
+import { printObj } from './util';
+import { logger } from './index';
 
 var toCSV = Promise.promisify(json2csv);
 
 export function createWorkflow(sourceObservable, prompt, file) {
   gustav.source('dibelsSource', () => sourceObservable);
+  
   let config = {
     prompt: prompt,
     file: file
@@ -66,10 +37,10 @@ function testResultsTransform(config, observable) {
         .then(r => JSON.parse(r.toString()))
 
       const matchingTestScore = getMatchingStudentTestScore(
-          item['Student Primary ID'],
-          item['School Year'],
-          item['Composite Score'],
-          config.prompt.testId
+        item['Student Primary ID'],
+        item['School Year'],
+        item['Composite Score'],
+        config.prompt.testId
         )
         .then(r => {
           // Expecting there to NOT be any matching student test score Record
@@ -137,10 +108,10 @@ function proficiencyTransform(config, observable) {
   return observable
     .flatMap(item => {
       const matchingTestScore = getMatchingStudentTestScore(
-          item['Student Primary ID'],
-          item['School Year'],
-          item['Composite Score'],
-          config.prompt.testId
+        item['Student Primary ID'],
+        item['School Year'],
+        item['Composite Score'],
+        config.prompt.testId
         )
         .then(r => {
           // Expecting there to be 1 matching student test score record
@@ -157,15 +128,15 @@ function proficiencyTransform(config, observable) {
 
       return Observable.zip(
         Observable.fromPromise(matchingTestScore)
-        .catch(e => {
-          logger.log('info', `Error fetching matching student test score for student_number: ${item['Student Primary ID']}`, {
-            psDbError: printObj(e)
-          });
-          logger.log('info', `dibels record for student_number: ${item['Student Primary ID']}`, {
-            sourceData: printObj(item)
-          });
-          return Observable.of({});
-        }),
+          .catch(e => {
+            logger.log('info', `Error fetching matching student test score for student_number: ${item['Student Primary ID']}`, {
+              psDbError: printObj(e)
+            });
+            logger.log('info', `dibels record for student_number: ${item['Student Primary ID']}`, {
+              sourceData: printObj(item)
+            });
+            return Observable.of({});
+          }),
 
         Observable.of(item),
 
@@ -173,15 +144,15 @@ function proficiencyTransform(config, observable) {
           matchingTestScore: s1,
           record: s2
         })
-      );
+        );
 
     })
     .flatMap(item => {
       let matchingProficiency = getMatchingProficiency(
-          item.record['Student Primary ID'],
-          item.record['School Year'],
-          item.record['Composite Score'],
-          config.prompt.testId
+        item.record['Student Primary ID'],
+        item.record['School Year'],
+        item.record['Composite Score'],
+        config.prompt.testId
         )
         .then(r => {
           if (r.rows.length) {
@@ -195,15 +166,15 @@ function proficiencyTransform(config, observable) {
 
       return Observable.zip(
         Observable.fromPromise(matchingProficiency)
-        .catch(e => {
-          logger.log('info', `Error fetching matching student proficiency record for student_number: ${item['Student Primary ID']}`, {
-            psDbError: printObj(e)
-          });
-          logger.log('info', `dibels record for student_number: ${item['Student Primary ID']}`, {
-            sourceData: printObj(item)
-          });
-          return Observable.of({});
-        }),
+          .catch(e => {
+            logger.log('info', `Error fetching matching student proficiency record for student_number: ${item['Student Primary ID']}`, {
+              psDbError: printObj(e)
+            });
+            logger.log('info', `dibels record for student_number: ${item['Student Primary ID']}`, {
+              sourceData: printObj(item)
+            });
+            return Observable.of({});
+          }),
 
         Observable.of(item),
 
@@ -212,7 +183,7 @@ function proficiencyTransform(config, observable) {
           studentTestScore: s2.matchingTestScore,
           proficiency: s1
         })
-      )
+        )
     })
     .filter(item => {
       // if item.proficiency === {}, no matching proficiency records were found, so allow it through
@@ -242,15 +213,16 @@ function createTransformer(config, sourceObservable) {
 /**
  * maps objects emitted by srcObservable to a new Observable that
  * converts those objects to csv strings and emits the results
- * @param  {Observable}
+ * 
+ * @param  {object}     config 
+ * @param  {Observable} srcObservable
  * @return {Disposable}
  */
 function csvObservable(config, srcObservable) {
   var ws;
   let csvObservable = srcObservable.concatMap(async function(item, i) {
     if (i === 0) {
-      /*let outputFilename = `output/${toFileName(item.extra.testProgramDesc)}.txt`;*/
-      let outputFilename = `output/${basename(config.file, extname(config.file))}-${config.prompt.table}${extname(config.file)}`;
+      let outputFilename = `output/${basename(config.file, extname(config.file)) }-${config.prompt.table}${extname(config.file) }`;
       console.log('outputFilename == ', outputFilename);
       // creates file if it doesn't exist
       ws = createWriteStream(outputFilename, {
@@ -260,10 +232,10 @@ function csvObservable(config, srcObservable) {
       await fs.truncate(outputFilename);
     }
     return toCSV({
-        data: item,
-        del: '\t',
-        hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
-      })
+      data: item,
+      del: '\t',
+      hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
+    })
       .then(csvStr => {
         let csvRemQuotes = csvStr.replace(/"/g, '');
 

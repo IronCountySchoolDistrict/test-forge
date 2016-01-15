@@ -1,9 +1,6 @@
 require('babel-polyfill');
 
-import {
-  prompt
-}
-from 'inquirer';
+import { prompt } from 'inquirer';
 import {
   getMatchingTests,
   getCrtTestResults,
@@ -16,11 +13,7 @@ import json2csv from 'json2csv';
 // import { workflow } from './workflow';
 import * as crt from './crt';
 import * as dibels from './dibels';
-import {
-  Observable,
-  Node
-}
-from '@reactivex/rxjs';
+import { Observable } from '@reactivex/rxjs';
 import Bluebird from 'bluebird';
 
 var toCSV = Bluebird.promisify(json2csv);
