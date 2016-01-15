@@ -1,70 +1,19 @@
 require('babel-polyfill');
 
-
-import {
-  createWriteStream,
-  truncateSync
-}
-from 'fs';
+import { createWriteStream, truncateSync } from 'fs';
 import Promise from 'bluebird';
 import fs from 'fs-promise';
-import {
-  Observable
-}
-from '@reactivex/rxjs';
-
-import {
-  isEmpty
-}
-from 'lodash';
-import {
-  gustav
-}
-from 'gustav';
-
+import { Observable } from '@reactivex/rxjs';
+import { isEmpty } from 'lodash';
+import { gustav } from 'gustav';
 import json2csv from 'json2csv';
-import {
-  EOL
-}
-from 'os';
+import { EOL } from 'os';
 
-import {
-  getStudentIdFromSsid,
-  getStudentNumberFromSsid,
-  getTestDcid,
-  getMatchingStudentTestScore,
-  getMatchingTests
-}
-from './service';
-
-import {
-  logger
-}
-from './index';
-
-import {
-  printObj
-}
-from './util';
+import { getStudentIdFromSsid, getStudentNumberFromSsid, getTestDcid, getMatchingStudentTestScore, getMatchingTests } from './service';
+import { logger } from './index';
+import { printObj } from './util';
 
 var toCSV = Promise.promisify(json2csv);
-
-var count = 0;
-var blankCount = 0;
-
-async function asyncExec(command) {
-  return new Promise((resolve, reject) => {
-    exec(command, function(error, stdout, stderr) {
-      if (error) {
-        reject(error);
-      } else if (stderr) {
-        reject(stderr);
-      } else {
-        resolve(stdout);
-      }
-    });
-  });
-}
 
 export function createWorkflow(sourceObservable, prompt) {
   var config = {
@@ -76,7 +25,7 @@ export function createWorkflow(sourceObservable, prompt) {
   return gustav.createWorkflow()
     .source('dataSource')
     .transf(transformer, config)
-    /*.transf(filterEmpty)*/
+  /*.transf(filterEmpty)*/
     .sink(crtCsvSink, config);
   // .sink(consoleNode);
 }
@@ -118,21 +67,21 @@ function testResultsTransform(observer) {
 
       let matchingTestsObs = Observable.fromPromise(getMatchingTests(item.test_program_desc))
         .map(matchingTests => {
-          if (!matchingTests.rows.length === 1) {
+          if (!(matchingTests.rows.length === 1)) {
             throw {
               studentTestScore: matchingTests,
               testResult: item,
-              message: `expected getMatchingTests to return 1 record, got ${r.rows.length} rows`
+              message: `expected getMatchingTests to return 1 record, got ${matchingTests.rows.length} rows`
             };
           } else {
             return matchingTests.rows[0].ID
           }
         })
         .catch(e => {
-          logger.log('info', `Error finding matching test for ssid: ${item.testResult.ssid}`, {
+          logger.log('info', `Error finding matching test for ssid: ${item.ssid}`, {
             psDbError: printObj(e)
           });
-          logger.log('info', `SAMS DB Record for student_test_id: ${item.testResult.student_test_id}`, {
+          logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
             sourceData: printObj(item)
           });
           return Observable.of(0);
@@ -155,10 +104,10 @@ function testResultsTransform(observer) {
     .flatMap(item => {
       let fullSchoolYear = toFullSchoolYear(item.testResult.school_year);
       let matchingTestScore = getMatchingStudentTestScore(
-          item.studentNumber,
-          fullSchoolYear,
-          item.testResult.test_overall_score,
-          item.matchingTestId)
+        item.studentNumber,
+        fullSchoolYear,
+        item.testResult.test_overall_score,
+        item.matchingTestId)
         .then(r => {
           // Expecting there to NOT be any matching student test score record,
           // so if there is one or more, throw an exception
@@ -230,21 +179,21 @@ function proficiencyTransform(observer) {
 
       let matchingTestsObs = Observable.fromPromise(getMatchingTests(item.test_program_desc))
         .map(matchingTests => {
-          if (!matchingTests.rows.length === 1) {
+          if (!(matchingTests.rows.length === 1)) {
             throw {
               studentTestScore: matchingTests,
               testResult: item,
-              message: `expected getMatchingTests to return 1 record, got ${r.rows.length} rows`
+              message: `expected getMatchingTests to return 1 record, got ${matchingTests.rows.length} rows`
             };
           } else {
             return matchingTests.rows[0].ID
           }
         })
         .catch(e => {
-          logger.log('info', `Error finding matching test for ssid: ${item.testResult.ssid}`, {
+          logger.log('info', `Error finding matching test for ssid: ${item.ssid}`, {
             psDbError: printObj(e)
           });
-          logger.log('info', `SAMS DB Record for student_test_id: ${item.testResult.student_test_id}`, {
+          logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
             sourceData: printObj(item)
           });
           return Observable.of(0);
@@ -262,16 +211,16 @@ function proficiencyTransform(observer) {
           matchingTestId: matchingTest,
           testResult: item
         })
-      );
+        );
     })
     .flatMap(item => {
 
       let fullSchoolYear = toFullSchoolYear(item.testResult.school_year);
       let matchingTestScore = getMatchingStudentTestScore(
-          item.studentNumber,
-          fullSchoolYear,
-          item.testResult.test_overall_score,
-          item.matchingTestId)
+        item.studentNumber,
+        fullSchoolYear,
+        item.testResult.test_overall_score,
+        item.matchingTestId)
         .then(r => {
           // Expecting there to NOT be any matching student test score record,
           // so if there is one or more, throw an exception
@@ -296,7 +245,7 @@ function proficiencyTransform(observer) {
           return {
             csvOutput: {
               studentTestScoreDcid: matchingTestScoreDcid,
-              benchmark: item.testResult.proficiency
+              proficiency: item.testResult.proficiency
             },
             extra: {
               testProgramDesc: item.testResult.test_program_desc,
@@ -314,16 +263,6 @@ function transformer(config, observer) {
   if (config.prompt.table === 'U_StudentTestProficiency') {
     return proficiencyTransform(observer);
   }
-}
-
-function filterEmpty(observer) {
-  return observer
-    .filter(item => {
-      if (!(!isEmpty(item.testResult) && !isEmpty(item.extra))) {
-        blankCount++;
-      }
-      return !isEmpty(item.testResult) && !isEmpty(item.extra);
-    });
 }
 
 
@@ -363,7 +302,7 @@ function crtCsvSink(config, observable) {
         () => {
           ws.end();
         }
-      );
+        );
     });
 }
 
@@ -378,11 +317,10 @@ function crtCsvSink(config, observable) {
  *     		}
  */
 function toCsvObservable(config, srcObservable) {
-  console.log('config == %j', config);
-  return srcObservable.concatMap(function(item, i) {
+  return srcObservable.concatMap(function (item, i) {
     if (i === 0) {
       console.log('getting outputFilename');
-      let outputFilename = `output/EOL - ${item.extra.testProgramDesc}-${config.prompt.table}.txt`;
+      let outputFilename = `output/crt/EOL - ${item.extra.testProgramDesc}-${config.prompt.table}.txt`;
 
       // creates file if it doesn't exist
       var ws = createWriteStream(outputFilename, {
@@ -391,7 +329,7 @@ function toCsvObservable(config, srcObservable) {
       console.log(`created write stream for ${outputFilename}`);
 
       try {
-        ws.on('open', function(fd) {
+        ws.on('open', function (fd) {
           truncateSync(outputFilename);
         });
       } catch (e) {
@@ -400,10 +338,10 @@ function toCsvObservable(config, srcObservable) {
       }
     }
     return toCSV({
-        data: item.csvOutput,
-        del: '\t',
-        hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
-      })
+      data: item.csvOutput,
+      del: '\t',
+      hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
+    })
       .then(csvStr => {
         let csvRemQuotes = csvStr.replace(/"/g, '');
 
