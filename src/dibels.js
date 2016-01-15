@@ -223,7 +223,7 @@ function csvObservable(config, srcObservable) {
   let csvObservable = srcObservable.concatMap(async function(item, i) {
     if (i === 0) {
       let outputFilename = `output/${basename(config.file, extname(config.file)) }-${config.prompt.table}${extname(config.file) }`;
-      console.log('outputFilename == ', outputFilename);
+      
       // creates file if it doesn't exist
       ws = createWriteStream(outputFilename, {
         flags: 'a'
