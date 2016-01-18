@@ -1,30 +1,40 @@
 #!/usr/bin/env node
+///<reference path="../typings/rx/rx.d.ts"/>
 
 Error.stackTraceLimit = Infinity;
 require('babel-polyfill');
 
 import program from 'commander';
 import fs from 'fs-promise';
-
 import split from 'split';
-import { promptHandlerFile, promptHandlerSams } from './prompt';
-import { setOrawrapConfig } from './database';
-
+import winston from 'winston';
 import { Observable } from '@reactivex/rxjs';
 import { createReadStream } from 'fs';
-
 import { zipObject } from 'lodash';
 import csv from 'csv';
 import Bluebird from 'bluebird';
 
 import { msExecute }   from './database';
-import winston from 'winston';
+import { promptHandlerFile, promptHandlerSams } from './prompt';
+import { setOrawrapConfig } from './database';
 
 export var oraWrapInst;
 export var logger;
+export var config;
 
 var Promise = Bluebird;
 
+/**
+ * @return {object}
+ */
+async function getConfig() {
+  let rawConfig = await fs.readFile('config.json');
+  return JSON.parse(rawConfig);
+}
+
+/**
+ * @return {object}
+ */
 async function getPackage() {
   let rawPackage = await fs.readFile('package.json');
   return JSON.parse(rawPackage);
@@ -43,6 +53,8 @@ function asyncCsvParse(str, options) {
 }
 
 async function main() {
+  
+  // Set Globals
   logger = new winston.Logger({
     transports: [
       new winston.transports.File({
@@ -53,9 +65,9 @@ async function main() {
     exitOnError: false
   });
   logger.log('info', `starting up test-forge`);
-
-
+  config = await getConfig();
   oraWrapInst = await setOrawrapConfig();
+  
   let jsonPackage = await getPackage();
   program
     .version(jsonPackage.version)
