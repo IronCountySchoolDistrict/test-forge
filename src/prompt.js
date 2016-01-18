@@ -1,16 +1,16 @@
 require('babel-polyfill');
 
 import { prompt } from 'inquirer';
-import { getMatchingTests, getCrtTestResults, getCrtProficiency } from './service';
-import detect from './detector';
-import transform from './transform';
 import json2csv from 'json2csv';
-// import { workflow } from './workflow';
-import * as crt from './crt';
-import * as dibels from './dibels';
-import * as sage from './sage';
 import { Observable } from '@reactivex/rxjs';
 import Bluebird from 'bluebird';
+
+import detect from './detector';
+import * as sage from './sage';
+import * as crt from './crt';
+import * as dibels from './dibels';
+import { getMatchingTests, getCrtTestResults, getCrtProficiency } from './service';
+
 
 var toCSV = Bluebird.promisify(json2csv);
 
