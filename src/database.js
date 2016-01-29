@@ -56,11 +56,13 @@ export function execute(sql, bind, opts) {
 }
 
 export function msExecute(sql) {
+  console.log('in msExecute Observable');
   return new Observable(observer => {
-    var connection = new mssql.Connection(config.database.sams, function (err) {
+    config.database.sams.requestTimeout = 60000;
+    
+    var connection = new mssql.Connection(config.database.sams, err => {
       var request = new mssql.Request(connection);
       request.stream = true;
-      console.log('creating query');
       request.query(sql);
       request.on('row', row => {
         observer.next(row);
@@ -68,9 +70,10 @@ export function msExecute(sql) {
       request.on('error', err => {
         observer.error(err);
       });
-      request.on('done', () => {
-        observer.complete();
+      request.on('done', (returnValue, affected) => {
+        console.log('finished request');
         connection.close();
+        observer.complete();
       });
     });
     connection.on('error', error => console.log(`mssql error == ${error}`));

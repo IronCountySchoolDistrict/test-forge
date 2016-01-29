@@ -9,7 +9,7 @@ import { gustav } from 'gustav';
 import json2csv from 'json2csv';
 import { EOL } from 'os';
 
-import { getStudentIdFromSsid, getStudentNumberFromSsid, getTestDcid, getMatchingStudentTestScore, getMatchingTests } from './service';
+import { getStudentIdFromSsid, getStudentNumberFromSsid, getTestDcid, getMatchingStudentTestScore, getTestFromName } from './service';
 import { logger } from './index';
 import { printObj } from './util';
 
@@ -25,16 +25,32 @@ export function createWorkflow(sourceObservable, prompt) {
   return gustav.createWorkflow()
     .source('dataSource')
     .transf(transformer, config)
-  /*.transf(filterEmpty)*/
     .sink(crtCsvSink, config);
-  // .sink(consoleNode);
+}
+
+function transformer(config, observer) {
+  if (config.prompt.table === 'Test Results') {
+    return testResultsTransform(observer);
+  }
+  if (config.prompt.table === 'U_StudentTestProficiency') {
+    return proficiencyTransform(observer);
+  }
 }
 
 function testResultsTransform(observer) {
+
   return observer
     .map(item => {
-      // If test_program_desc is spelled wrong, replace that value with the correctly spelled value
+      // If item.test_program_desc is spelled wrong, replace that value with the correctly spelled value
       item.test_program_desc = item.test_program_desc === 'Earth Sytems Science' ? 'Earth Systems Science' : item.test_program_desc
+      return item;
+    })
+    .map(item => {
+      if (item.test_program_desc === 'Algebra 1') {
+        item.test_program_desc = 'Algebra I';
+      } else if (item.item_program_desc === 'Algebra 2') {
+        item.test_program_desc = 'Algebra II';
+      }
       return item;
     })
     .map(item => {
@@ -42,7 +58,6 @@ function testResultsTransform(observer) {
       return item;
     })
     .flatMap(item => {
-
       let studentNumberObs = Observable.fromPromise(getStudentNumberFromSsid(item.ssid))
         .catch(e => {
           logger.log('info', `Error fetching student number for ssid: ${item.ssid}`, {
@@ -51,8 +66,9 @@ function testResultsTransform(observer) {
           logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
             sourceData: printObj(item)
           });
-          return Observable.of({});
-        });
+          return Observable.of(0);
+        })
+        .filter(studentNumber => !!studentNumber)
 
       let studentIdObs = Observable.fromPromise(getStudentIdFromSsid(item.ssid))
         .catch(e => {
@@ -62,16 +78,17 @@ function testResultsTransform(observer) {
           logger.log('info', `SAMS DB Record for student_test_id: ${item.student_test_id}`, {
             sourceData: printObj(item)
           });
-          return Observable.of({});
-        });
+          return Observable.of(0);
+        })
+        .filter(studentId => !!studentId)
 
-      let matchingTestsObs = Observable.fromPromise(getMatchingTests(item.test_program_desc))
+      let matchingTestsObs = Observable.fromPromise(getTestFromName(`EOL - ${item.test_program_desc}`))
         .map(matchingTests => {
           if (!(matchingTests.rows.length === 1)) {
             throw {
               studentTestScore: matchingTests,
               testResult: item,
-              message: `expected getMatchingTests to return 1 record, got ${matchingTests.rows.length} rows`
+              message: `expected getTestFromName to return 1 record, got ${matchingTests.rows.length} rows`
             };
           } else {
             return matchingTests.rows[0].ID
@@ -99,10 +116,11 @@ function testResultsTransform(observer) {
           matchingTestId: matchingTest,
           testResult: item
         })
-      );
+        );
     })
     .flatMap(item => {
       let fullSchoolYear = toFullSchoolYear(item.testResult.school_year);
+      
       let matchingTestScore = getMatchingStudentTestScore(
         item.studentNumber,
         fullSchoolYear,
@@ -135,7 +153,7 @@ function testResultsTransform(observer) {
               'Student Id': item.studentId,
               'Student Number': item.studentNumber,
               'Grade Level': item.testResult.grade_level,
-              'Composite Score Alpha': item.testResult.test_overall_score
+              'Composite Score Num': item.testResult.test_overall_score
             },
             'extra': {
               testProgramDesc: item.testResult.test_program_desc,
@@ -151,6 +169,14 @@ function proficiencyTransform(observer) {
     .map(item => {
       // If test_program_desc is spelled wrong, replace that value with the correctly spelled value
       item.test_program_desc = item.test_program_desc === 'Earth Sytems Science' ? 'Earth Systems Science' : item.test_program_desc
+      return item;
+    })
+    .map(item => {
+      if (item.test_program_desc === 'Algebra 1') {
+        item.test_program_desc = 'Algebra I';
+      } else if (item.item_program_desc === 'Algebra 2') {
+        item.test_program_desc = 'Algebra II';
+      }
       return item;
     })
     .flatMap(item => {
@@ -177,13 +203,13 @@ function proficiencyTransform(observer) {
           return Observable.of({});
         });
 
-      let matchingTestsObs = Observable.fromPromise(getMatchingTests(item.test_program_desc))
+      let matchingTestsObs = Observable.fromPromise(getTestFromName(`EOL - ${item.test_program_desc}`))
         .map(matchingTests => {
           if (!(matchingTests.rows.length === 1)) {
             throw {
               studentTestScore: matchingTests,
               testResult: item,
-              message: `expected getMatchingTests to return 1 record, got ${matchingTests.rows.length} rows`
+              message: `expected getTestFromName to return 1 record, got ${matchingTests.rows.length} rows`
             };
           } else {
             return matchingTests.rows[0].ID
@@ -256,15 +282,6 @@ function proficiencyTransform(observer) {
     })
 }
 
-function transformer(config, observer) {
-  if (config.prompt.table === 'Test Results') {
-    return testResultsTransform(observer);
-  }
-  if (config.prompt.table === 'U_StudentTestProficiency') {
-    return proficiencyTransform(observer);
-  }
-}
-
 
 /**
  * converts a school year in the format "2011" to "2010-2011"
@@ -300,6 +317,7 @@ function crtCsvSink(config, observable) {
         error => console.log('error == ', error),
 
         () => {
+          console.log('close writestream');
           ws.end();
         }
         );
@@ -321,14 +339,12 @@ function crtCsvSink(config, observable) {
 function toCsvObservable(config, srcObservable) {
   return srcObservable.concatMap(function (item, i) {
     if (i === 0) {
-      console.log('getting outputFilename');
       let outputFilename = `output/crt/EOL - ${item.extra.testProgramDesc}-${config.prompt.table}.txt`;
 
       // creates file if it doesn't exist
       var ws = createWriteStream(outputFilename, {
         flags: 'a'
       });
-      console.log(`created write stream for ${outputFilename}`);
 
       try {
         ws.on('open', function (fd) {

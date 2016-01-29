@@ -9,7 +9,7 @@ import detect from './detector';
 import * as sage from './sage';
 import * as crt from './crt';
 import * as dibels from './dibels';
-import { getMatchingTests, getCrtTestResults, getCrtProficiency } from './service';
+import { getMatchingTests, getTestFromName, getCrtTestResults, getCrtProficiency } from './service';
 
 
 var toCSV = Bluebird.promisify(json2csv);
@@ -23,7 +23,7 @@ function asyncPrompt(questions) {
 }
 
 async function promptTestId(test) {
-
+  console.log('test == ', test)
   let matchingTests = await getMatchingTests(test.name);
   let testChoices = matchingTests.rows.map(test => ({
     name: test.NAME,
@@ -125,7 +125,9 @@ export async function promptHandlerSams(test) {
     } else {
       source = await getCrtProficiency();
     }
-
+    // console.time('count');
+    source.count().subscribe(x => console.log('count == ', x));
+    
     let workflow = crt.createWorkflow(source, promptResps);
     workflow.start();
   } catch (e) {

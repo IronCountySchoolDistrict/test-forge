@@ -144,8 +144,7 @@ function proficiencyTransform(config, observable) {
           matchingTestScore: s1,
           record: s2
         })
-        );
-
+      );
     })
     .flatMap(item => {
       let matchingProficiency = getMatchingProficiency(
@@ -222,7 +221,7 @@ function csvObservable(config, srcObservable) {
   var ws;
   let csvObservable = srcObservable.concatMap(async function(item, i) {
     if (i === 0) {
-      let outputFilename = `output/${basename(config.file, extname(config.file)) }-${config.prompt.table}${extname(config.file) }`;
+      let outputFilename = `output/rogl/${basename(config.file, extname(config.file)) }-${config.prompt.table}${extname(config.file) }`;
       
       // creates file if it doesn't exist
       ws = createWriteStream(outputFilename, {
