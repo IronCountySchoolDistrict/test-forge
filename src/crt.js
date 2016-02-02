@@ -49,6 +49,7 @@ function testResultsTransform(observer) {
       if (item.test_program_desc === 'Algebra 1') {
         item.test_program_desc = 'Algebra I';
       } else if (item.item_program_desc === 'Algebra 2') {
+        
         item.test_program_desc = 'Algebra II';
       }
       return item;
@@ -168,13 +169,14 @@ function proficiencyTransform(observer) {
   return observer
     .map(item => {
       // If test_program_desc is spelled wrong, replace that value with the correctly spelled value
-      item.test_program_desc = item.test_program_desc === 'Earth Sytems Science' ? 'Earth Systems Science' : item.test_program_desc
+      item.test_program_desc = item.test_program_desc === 'Earth Sytems Science' ? 'Earth Systems Science' : item.test_program_desc;
       return item;
     })
     .map(item => {
       if (item.test_program_desc === 'Algebra 1') {
         item.test_program_desc = 'Algebra I';
-      } else if (item.item_program_desc === 'Algebra 2') {
+      } 
+      if (item.test_program_desc === 'Algebra 2') {
         item.test_program_desc = 'Algebra II';
       }
       return item;
