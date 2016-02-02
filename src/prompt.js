@@ -125,7 +125,6 @@ export async function promptHandlerSams(test) {
     } else {
       source = await getCrtProficiency();
     }
-    // console.time('count');
     source.count().subscribe(x => console.log('count == ', x));
     
     let workflow = crt.createWorkflow(source, promptResps);
