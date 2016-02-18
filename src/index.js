@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-///<reference path="../typings/rx/rx.d.ts"/>
 
 Error.stackTraceLimit = Infinity;
 require('babel-polyfill');
@@ -110,19 +109,22 @@ function createCsvObservable(file) {
     delimiter: '\t'
   };
 
+  let csvParse = Observable.bindCallback(csv.parse);
   let column = source
     .flatMap(line => {
-      return Observable.fromPromise(asyncCsvParse(line, csvOpts));
+      return csvParse(line, csvOpts);
     })
     .take(1);
 
   return source
     .flatMap(line => {
-      return Observable.fromPromise(asyncCsvParse(line, csvOpts));
+      return csvParse(line, csvOpts);
     })
     .skip(1)
     .withLatestFrom(column, (row, header) => {
-      return zipObject(header, row);
+      const headerArray = header[1][0];
+      const rowArray = row[1][0];
+      return zipObject(headerArray, rowArray);
     });
 }
 

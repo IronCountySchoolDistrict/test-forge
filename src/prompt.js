@@ -11,7 +11,6 @@ import * as crt from './crt';
 import * as dibels from './dibels';
 import { getMatchingTests, getTestFromName, getCrtTestResults, getCrtProficiency } from './service';
 
-
 var toCSV = Bluebird.promisify(json2csv);
 
 function asyncPrompt(questions) {
@@ -67,6 +66,7 @@ async function promptTable() {
 export async function promptHandlerFile(source, file) {
   try {
     source.take(1).subscribe(async function(csvData) {
+      console.log('csvData == ', csvData);
       let test = detect(csvData);
 
       if (test.name === 'ROGL') {
