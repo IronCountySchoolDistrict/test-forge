@@ -1,19 +1,10 @@
 // Collection of database queries
-import {
-  execute,
-  msExecute
-}
-from './database';
 import Promise from 'bluebird';
 import orawrap from 'orawrap';
-import {
-  Observable
-}
-from '@reactivex/rxjs';
-import {
-  logger
-}
-from './index';
+import { Observable } from '@reactivex/rxjs';
+
+import { execute, msExecute } from './database';
+import { logger } from './index';
 
 export function getMatchingStudentTest(studentNumber, termName, testId) {
   return execute(`
@@ -133,21 +124,7 @@ export function getStudentIdFromStudentNumber(studentNumber) {
     })
     .then(r => {
       return new Promise((resolve, reject) => {
-        if (r.rows.length > 1) {
-          reject({
-            error: new Error(`Expected getStudentIdFromStudentNumber() to return one row, got back ${r.rows.length} records`),
-            response: r
-          });
-        } else {
-          try {
-            resolve(r.rows[0].ID);
-          } catch (e) {
-            reject({
-              error: e,
-              response: r
-            })
-          }
-        }
+        
       });
     });
 }
@@ -160,25 +137,6 @@ export function getStudentIdFromSsid(ssid) {
     AND State_StudentNumber is not null
   `, [ssid], {
       outFormat: orawrap.OBJECT
-    })
-    .then(r => {
-      return new Promise((resolve, reject) => {
-        if (r.rows.length > 1) {
-          reject({
-            error: new Error(`Expected getStudentIdFromSsid() to return one row, got back ${r.rows.length} records`),
-            response: r
-          });
-        } else {
-          try {
-            resolve(r.rows[0].ID);
-          } catch (e) {
-            reject({
-              error: e,
-              response: r
-            })
-          }
-        }
-      });
     });
 }
 
@@ -191,25 +149,6 @@ export function getStudentNumberFromSsid(ssid) {
     AND Student_number is not null
   `, [ssid], {
       outFormat: orawrap.OBJECT
-    })
-    .then(r => {
-      return new Promise((resolve, reject) => {
-        if (r.rows.length > 1) {
-          reject({
-            error: new Error(`Expected getStudentNumberFromSsid() to return one row, got back ${r.rows.length} records`),
-            response: r
-          });
-        } else {
-          try {
-            resolve(r.rows[0].STUDENT_NUMBER);
-          } catch (e) {
-            return {
-              error: new Error(`Could not access r.rows[0].STUDENT_NUMBER`),
-              response: r
-            }
-          }
-        }
-      });
     });
 }
 
@@ -218,6 +157,8 @@ export function getCrtTestResults() {
     SELECT [student_test].student_test_id,
        [student_test].school_year,
        [student_master].ssid,
+       [student_master].first_name,
+       [student_master].last_name,
        [student_enrollment].grade_level,
        [student_test].test_overall_score,
        [test_program].test_program_desc 
@@ -242,6 +183,8 @@ export function getCrtTestResults() {
     SELECT [student_test].student_test_id,
           [student_test].school_year,
           [student_master].ssid,
+         [student_master].first_name,
+         [student_master].last_name,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
           [test_program].test_program_desc
@@ -266,6 +209,8 @@ export function getCrtTestResults() {
     SELECT [student_test].student_test_id,
           [student_test].school_year,
           [student_master].ssid,
+       [student_master].first_name,
+       [student_master].last_name,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
           [test_program].test_program_desc
@@ -290,6 +235,8 @@ export function getCrtTestResults() {
     SELECT [student_test].student_test_id,
           [student_test].school_year,
           [student_master].ssid,
+       [student_master].first_name,
+       [student_master].last_name,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
           [test_program].test_program_desc
@@ -314,6 +261,8 @@ export function getCrtTestResults() {
     SELECT [student_test].student_test_id,
           [student_test].school_year,
           [student_master].ssid,
+       [student_master].first_name,
+       [student_master].last_name,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
           [test_program].test_program_desc
@@ -338,6 +287,8 @@ export function getCrtTestResults() {
     SELECT [student_test].student_test_id,
           [student_test].school_year,
           [student_master].ssid,
+       [student_master].first_name,
+       [student_master].last_name,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
           [test_program].test_program_desc
@@ -362,6 +313,8 @@ export function getCrtTestResults() {
     SELECT [student_test].student_test_id,
           [student_test].school_year,
           [student_master].ssid,
+       [student_master].first_name,
+       [student_master].last_name,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
           [test_program].test_program_desc
@@ -386,6 +339,8 @@ UNION
     SELECT [student_test].student_test_id,
           [student_test].school_year,
           [student_master].ssid,
+       [student_master].first_name,
+       [student_master].last_name,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
           [test_program].test_program_desc
@@ -410,6 +365,8 @@ UNION
     SELECT [student_test].student_test_id,
           [student_test].school_year,
           [student_master].ssid,
+       [student_master].first_name,
+       [student_master].last_name,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
           [test_program].test_program_desc
@@ -434,6 +391,8 @@ UNION
     SELECT [student_test].student_test_id,
           [student_test].school_year,
           [student_master].ssid,
+       [student_master].first_name,
+       [student_master].last_name,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
           [test_program].test_program_desc
@@ -458,6 +417,8 @@ UNION
     SELECT [student_test].student_test_id,
           [student_test].school_year,
           [student_master].ssid,
+       [student_master].first_name,
+       [student_master].last_name,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
           [test_program].test_program_desc
@@ -482,6 +443,8 @@ UNION
     SELECT [student_test].student_test_id,
           [student_test].school_year,
           [student_master].ssid,
+       [student_master].first_name,
+       [student_master].last_name,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
           [test_program].test_program_desc
@@ -506,6 +469,8 @@ UNION
     SELECT [student_test].student_test_id,
           [student_test].school_year,
           [student_master].ssid,
+       [student_master].first_name,
+       [student_master].last_name,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
           [test_program].test_program_desc
