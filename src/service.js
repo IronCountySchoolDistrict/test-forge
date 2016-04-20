@@ -1,10 +1,11 @@
 // Collection of database queries
 import Promise from 'bluebird';
 import orawrap from 'orawrap';
-import { Observable } from '@reactivex/rxjs';
+import {Observable} from '@reactivex/rxjs';
+import cache from 'memory-cache';
 
-import { execute, msExecute } from './database';
-import { logger } from './index';
+import {execute, msExecute} from './database';
+import {logger} from './index';
 
 export function getMatchingStudentTest(studentNumber, termName, testId) {
   return execute(`
@@ -87,13 +88,20 @@ export function getMatchingProficiency(studentNumber, termName, alphaScore, test
 }
 
 export function getTestFromName(searchTerm) {
+  const rnd = Math.random() * 100;
+  console.time(rnd);
   return execute(`
     SELECT id, name
     FROM test
     WHERE name = :searchTerm
     `, [searchTerm], {
-    outFormat: orawrap.OBJECT
-  });
+    outFormat: orawrap.OBJECT,
+    maxRows: 1
+  })
+    .then(result => {
+      console.timeEnd(rnd);
+      return result;
+    });
 }
 
 export function getMatchingTests(searchTerm) {
@@ -114,19 +122,57 @@ export function getTestDcid(testId) {
   });
 }
 
+export function getStudentIdsFromSsidBatch(ssids) {
+  return execute(`
+    SELECT
+      state_studentnumber,
+      student_number
+    FROM students
+    WHERE state_studentnumber IN (:ssids)`,
+    [ssids.join(',')],
+    {outFormat: orawrap.OBJECT}
+  );
+}
+
+export function getStudentIdsFromSsidBatchDual(ssids) {
+  try {
+    return execute(`
+    SELECT
+      ssid_input.ssid AS ssid,
+      students.id AS student_id,
+      students.student_number AS student_number
+    FROM (
+           SELECT REGEXP_SUBSTR(
+                      :ssids,
+                      '[^,]+', 1, level) AS ssid
+           FROM dual
+           CONNECT BY REGEXP_SUBSTR(
+                          :ssids,
+                          '[^,]+', 1, level) IS NOT NULL
+    ) ssid_input
+    LEFT JOIN students ON students.state_studentnumber = ssid_input.ssid`,
+      {
+        ssids: {val: ssids.join(','), dir: orawrap.BIND_IN, type: orawrap.STRING}
+      },
+      {
+        outFormat: orawrap.OBJECT,
+        maxRows: ssids.length
+      }
+    );
+  } catch (e) {
+    console.error(e);
+  }
+
+}
+
 export function getStudentIdFromStudentNumber(studentNumber) {
   return execute(`
     SELECT id
     FROM students
     WHERE student_number=:studentNumber
   `, [studentNumber], {
-      outFormat: orawrap.OBJECT
-    })
-    .then(r => {
-      return new Promise((resolve, reject) => {
-        
-      });
-    });
+    outFormat: orawrap.OBJECT
+  });
 }
 
 export function getStudentIdFromSsid(ssid) {
@@ -136,8 +182,8 @@ export function getStudentIdFromSsid(ssid) {
     WHERE State_StudentNumber=:ssid
     AND State_StudentNumber is not null
   `, [ssid], {
-      outFormat: orawrap.OBJECT
-    });
+    outFormat: orawrap.OBJECT
+  });
 }
 
 export function getStudentNumberFromSsid(ssid) {
@@ -148,8 +194,8 @@ export function getStudentNumberFromSsid(ssid) {
     AND State_StudentNumber is not null
     AND Student_number is not null
   `, [ssid], {
-      outFormat: orawrap.OBJECT
-    });
+    outFormat: orawrap.OBJECT
+  });
 }
 
 export function getCrtTestResults() {
@@ -157,11 +203,9 @@ export function getCrtTestResults() {
     SELECT [student_test].student_test_id,
        [student_test].school_year,
        [student_master].ssid,
-       [student_master].first_name,
-       [student_master].last_name,
        [student_enrollment].grade_level,
        [student_test].test_overall_score,
-       [test_program].test_program_desc 
+       [test_program].test_program_desc
     FROM   [sams_2008].[dbo].[student_test]
           INNER JOIN [sams_2008].[dbo].[student_enrollment]
                   ON [sams_2008].[dbo].[student_test].[student_id] =
@@ -179,319 +223,7 @@ export function getCrtTestResults() {
                       AND [sams_2008].[dbo].[student_test].test_overall_score != 0
                       AND [sams_2008].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-    UNION
-    SELECT [student_test].student_test_id,
-          [student_test].school_year,
-          [student_master].ssid,
-         [student_master].first_name,
-         [student_master].last_name,
-          [student_enrollment].grade_level,
-          [student_test].test_overall_score,
-          [test_program].test_program_desc
-    FROM   [sams_2009].[dbo].[student_test]
-          INNER JOIN [sams_2009].[dbo]. [student_enrollment]
-                  ON [sams_2009].[dbo].[student_test].[student_id] =
-                                [sams_2009].[dbo]. [student_enrollment].[student_id]
-                      AND [sams_2009].[dbo].[student_test].school_year =
-                          [sams_2009].[dbo]. [student_enrollment].school_year
-                      AND [sams_2009].[dbo].[student_test].school_number =
-                          [sams_2009].[dbo]. [student_enrollment].school_number
-          INNER JOIN [sams_2009].[dbo].[student_master]
-                  ON [sams_2009].[dbo].[student_test].[student_id] =
-                      [sams_2009].[dbo] . [student_master].[student_id]
-          INNER JOIN [sams_2009].[dbo].[test_program]
-                  ON [sams_2009].[dbo].[student_test].[test_prog_id] =
-                                [sams_2009] .[dbo]. [test_program].[test_prog_id]
-                      AND [sams_2009].[dbo].[student_test].test_overall_score != 0
-                      AND [sams_2009].[dbo].[student_test].test_overall_score IS NOT
-                          NULL
-    UNION
-    SELECT [student_test].student_test_id,
-          [student_test].school_year,
-          [student_master].ssid,
-       [student_master].first_name,
-       [student_master].last_name,
-          [student_enrollment].grade_level,
-          [student_test].test_overall_score,
-          [test_program].test_program_desc
-    FROM   [sams_2010].[dbo].[student_test]
-          INNER JOIN [sams_2010].[dbo].[student_enrollment]
-                  ON [sams_2010].[dbo].[student_test].[student_id] =
-                                [sams_2010].[dbo]. [student_enrollment].[student_id]
-                      AND [sams_2010].[dbo].[student_test].school_year =
-                          [sams_2010].[dbo]. [student_enrollment].school_year
-                      AND [sams_2010].[dbo].[student_test].school_number =
-                          [sams_2010].[dbo]. [student_enrollment].school_number
-          INNER JOIN [sams_2010].[dbo].[student_master]
-                  ON [sams_2010].[dbo].[student_test].[student_id] =
-                      [sams_2010].[dbo] . [student_master].[student_id]
-          INNER JOIN [sams_2010].[dbo].[test_program]
-                  ON [sams_2010].[dbo].[student_test].[test_prog_id] =
-                                [sams_2010] .[dbo]. [test_program].[test_prog_id]
-                      AND [sams_2010].[dbo].[student_test].test_overall_score != 0
-                      AND [sams_2010].[dbo].[student_test].test_overall_score IS NOT
-                          NULL
-    UNION
-    SELECT [student_test].student_test_id,
-          [student_test].school_year,
-          [student_master].ssid,
-       [student_master].first_name,
-       [student_master].last_name,
-          [student_enrollment].grade_level,
-          [student_test].test_overall_score,
-          [test_program].test_program_desc
-    FROM   [sams_2011].[dbo].[student_test]
-          INNER JOIN [sams_2011].[dbo]. [student_enrollment]
-                  ON [sams_2011].[dbo].[student_test].[student_id] =
-                                [sams_2011].[dbo]. [student_enrollment].[student_id]
-                      AND [sams_2011].[dbo].[student_test].school_year =
-                          [sams_2011].[dbo]. [student_enrollment].school_year
-                      AND [sams_2011].[dbo].[student_test].school_number =
-                          [sams_2011].[dbo]. [student_enrollment].school_number
-          INNER JOIN [sams_2011].[dbo].[student_master]
-                  ON [sams_2011].[dbo].[student_test].[student_id] =
-                      [sams_2011].[dbo] . [student_master].[student_id]
-          INNER JOIN [sams_2011].[dbo].[test_program]
-                  ON [sams_2011].[dbo].[student_test].[test_prog_id] =
-                                [sams_2011] .[dbo]. [test_program].[test_prog_id]
-                      AND [sams_2011].[dbo].[student_test].test_overall_score != 0
-                      AND [sams_2011].[dbo].[student_test].test_overall_score IS NOT
-                          NULL
-    UNION
-    SELECT [student_test].student_test_id,
-          [student_test].school_year,
-          [student_master].ssid,
-       [student_master].first_name,
-       [student_master].last_name,
-          [student_enrollment].grade_level,
-          [student_test].test_overall_score,
-          [test_program].test_program_desc
-    FROM   [sams_2012].[dbo].[student_test]
-          INNER JOIN [sams_2012].[dbo].[student_enrollment]
-                  ON [sams_2012].[dbo].[student_test].[student_id] =
-                                [sams_2012].[dbo]. [student_enrollment].[student_id]
-                      AND [sams_2012].[dbo].[student_test].school_year =
-                          [sams_2012].[dbo]. [student_enrollment].school_year
-                      AND [sams_2012].[dbo].[student_test].school_number =
-                          [sams_2012].[dbo]. [student_enrollment].school_number
-          INNER JOIN [sams_2012].[dbo].[student_master]
-                  ON [sams_2012].[dbo].[student_test].[student_id] =
-                      [sams_2012].[dbo] . [student_master].[student_id]
-          INNER JOIN [sams_2012].[dbo].[test_program]
-                  ON [sams_2012].[dbo].[student_test].[test_prog_id] =
-                                [sams_2012] .[dbo]. [test_program].[test_prog_id]
-                      AND [sams_2012].[dbo].[student_test].test_overall_score != 0
-                      AND [sams_2012].[dbo].[student_test].test_overall_score IS NOT
-                          NULL
-    UNION
-    SELECT [student_test].student_test_id,
-          [student_test].school_year,
-          [student_master].ssid,
-       [student_master].first_name,
-       [student_master].last_name,
-          [student_enrollment].grade_level,
-          [student_test].test_overall_score,
-          [test_program].test_program_desc
-    FROM   [sams_2013].[dbo].[student_test]
-          INNER JOIN [sams_2013].[dbo]. [student_enrollment]
-                  ON [sams_2013].[dbo].[student_test].[student_id] =
-                                [sams_2013].[dbo]. [student_enrollment].[student_id]
-                      AND [sams_2013].[dbo].[student_test].school_year =
-                          [sams_2013].[dbo]. [student_enrollment].school_year
-                      AND [sams_2013].[dbo].[student_test].school_number =
-                          [sams_2013].[dbo]. [student_enrollment].school_number
-          INNER JOIN [sams_2013].[dbo].[student_master]
-                  ON [sams_2013].[dbo].[student_test].[student_id] =
-                      [sams_2013].[dbo] . [student_master].[student_id]
-          INNER JOIN [sams_2013].[dbo].[test_program]
-                  ON [sams_2013].[dbo].[student_test].[test_prog_id] =
-                                [sams_2013] .[dbo]. [test_program].[test_prog_id]
-                      AND [sams_2013].[dbo].[student_test].test_overall_score != 0
-                      AND [sams_2013].[dbo].[student_test].test_overall_score IS NOT
-                          NULL
-    UNION
-    SELECT [student_test].student_test_id,
-          [student_test].school_year,
-          [student_master].ssid,
-       [student_master].first_name,
-       [student_master].last_name,
-          [student_enrollment].grade_level,
-          [student_test].test_overall_score,
-          [test_program].test_program_desc
-    FROM   [sams_merge].[dbo].[student_test]
-          INNER JOIN [sams_merge].[dbo]. [student_enrollment]
-                  ON [sams_merge].[dbo].[student_test].[student_id] =
-                                [sams_merge].[dbo]. [student_enrollment].[student_id]
-                      AND [sams_merge].[dbo].[student_test].school_year =
-                          [sams_merge].[dbo]. [student_enrollment].school_year
-                      AND [sams_merge].[dbo].[student_test].school_number =
-                          [sams_merge].[dbo]. [student_enrollment].school_number
-          INNER JOIN [sams_merge].[dbo].[student_master]
-                  ON [sams_merge].[dbo].[student_test].[student_id] =
-                      [sams_merge].[dbo] . [student_master].[student_id]
-          INNER JOIN [sams_merge].[dbo].[test_program]
-                  ON [sams_merge].[dbo].[student_test].[test_prog_id] =
-                                [sams_merge] .[dbo]. [test_program].[test_prog_id]
-                      AND [sams_merge].[dbo].[student_test].test_overall_score != 0
-                      AND [sams_merge].[dbo].[student_test].test_overall_score IS NOT
-                          NULL
-UNION
-    SELECT [student_test].student_test_id,
-          [student_test].school_year,
-          [student_master].ssid,
-       [student_master].first_name,
-       [student_master].last_name,
-          [student_enrollment].grade_level,
-          [student_test].test_overall_score,
-          [test_program].test_program_desc
-    FROM   [Success_2008].[dbo].[student_test]
-          INNER JOIN [Success_2008].[dbo]. [student_enrollment]
-                  ON [Success_2008].[dbo].[student_test].[student_id] =
-                                [Success_2008].[dbo]. [student_enrollment].[student_id]
-                      AND [Success_2008].[dbo].[student_test].school_year =
-                          [Success_2008].[dbo]. [student_enrollment].school_year
-                      AND [Success_2008].[dbo].[student_test].school_number =
-                          [Success_2008].[dbo]. [student_enrollment].school_number
-          INNER JOIN [Success_2008].[dbo].[student_master]
-                  ON [Success_2008].[dbo].[student_test].[student_id] =
-                      [Success_2008].[dbo] . [student_master].[student_id]
-          INNER JOIN [Success_2008].[dbo].[test_program]
-                  ON [Success_2008].[dbo].[student_test].[test_prog_id] =
-                                [Success_2008] .[dbo]. [test_program].[test_prog_id]
-                      AND [Success_2008].[dbo].[student_test].test_overall_score != 0
-                      AND [Success_2008].[dbo].[student_test].test_overall_score IS NOT
-                          NULL
-UNION
-    SELECT [student_test].student_test_id,
-          [student_test].school_year,
-          [student_master].ssid,
-       [student_master].first_name,
-       [student_master].last_name,
-          [student_enrollment].grade_level,
-          [student_test].test_overall_score,
-          [test_program].test_program_desc
-    FROM   [Success_2009].[dbo].[student_test]
-          INNER JOIN [Success_2009].[dbo]. [student_enrollment]
-                  ON [Success_2009].[dbo].[student_test].[student_id] =
-                                [Success_2009].[dbo]. [student_enrollment].[student_id]
-                      AND [Success_2009].[dbo].[student_test].school_year =
-                          [Success_2009].[dbo]. [student_enrollment].school_year
-                      AND [Success_2009].[dbo].[student_test].school_number =
-                          [Success_2009].[dbo]. [student_enrollment].school_number
-          INNER JOIN [Success_2009].[dbo].[student_master]
-                  ON [Success_2009].[dbo].[student_test].[student_id] =
-                      [Success_2009].[dbo] . [student_master].[student_id]
-          INNER JOIN [Success_2009].[dbo].[test_program]
-                  ON [Success_2009].[dbo].[student_test].[test_prog_id] =
-                                [Success_2009] .[dbo]. [test_program].[test_prog_id]
-                      AND [Success_2009].[dbo].[student_test].test_overall_score != 0
-                      AND [Success_2009].[dbo].[student_test].test_overall_score IS NOT
-                          NULL
-UNION
-    SELECT [student_test].student_test_id,
-          [student_test].school_year,
-          [student_master].ssid,
-       [student_master].first_name,
-       [student_master].last_name,
-          [student_enrollment].grade_level,
-          [student_test].test_overall_score,
-          [test_program].test_program_desc
-    FROM   [Success_2010].[dbo].[student_test]
-          INNER JOIN [Success_2010].[dbo]. [student_enrollment]
-                  ON [Success_2010].[dbo].[student_test].[student_id] =
-                                [Success_2010].[dbo]. [student_enrollment].[student_id]
-                      AND [Success_2010].[dbo].[student_test].school_year =
-                          [Success_2010].[dbo]. [student_enrollment].school_year
-                      AND [Success_2010].[dbo].[student_test].school_number =
-                          [Success_2010].[dbo]. [student_enrollment].school_number
-          INNER JOIN [Success_2010].[dbo].[student_master]
-                  ON [Success_2010].[dbo].[student_test].[student_id] =
-                      [Success_2010].[dbo] . [student_master].[student_id]
-          INNER JOIN [Success_2010].[dbo].[test_program]
-                  ON [Success_2010].[dbo].[student_test].[test_prog_id] =
-                                [Success_2010] .[dbo]. [test_program].[test_prog_id]
-                      AND [Success_2010].[dbo].[student_test].test_overall_score != 0
-                      AND [Success_2010].[dbo].[student_test].test_overall_score IS NOT
-                          NULL
-UNION
-    SELECT [student_test].student_test_id,
-          [student_test].school_year,
-          [student_master].ssid,
-       [student_master].first_name,
-       [student_master].last_name,
-          [student_enrollment].grade_level,
-          [student_test].test_overall_score,
-          [test_program].test_program_desc
-    FROM   [Success_2011].[dbo].[student_test]
-          INNER JOIN [Success_2011].[dbo]. [student_enrollment]
-                  ON [Success_2011].[dbo].[student_test].[student_id] =
-                                [Success_2011].[dbo]. [student_enrollment].[student_id]
-                      AND [Success_2011].[dbo].[student_test].school_year =
-                          [Success_2011].[dbo]. [student_enrollment].school_year
-                      AND [Success_2011].[dbo].[student_test].school_number =
-                          [Success_2011].[dbo]. [student_enrollment].school_number
-          INNER JOIN [Success_2011].[dbo].[student_master]
-                  ON [Success_2011].[dbo].[student_test].[student_id] =
-                      [Success_2011].[dbo] . [student_master].[student_id]
-          INNER JOIN [Success_2011].[dbo].[test_program]
-                  ON [Success_2011].[dbo].[student_test].[test_prog_id] =
-                                [Success_2011] .[dbo]. [test_program].[test_prog_id]
-                      AND [Success_2011].[dbo].[student_test].test_overall_score != 0
-                      AND [Success_2011].[dbo].[student_test].test_overall_score IS NOT
-                          NULL
-UNION
-    SELECT [student_test].student_test_id,
-          [student_test].school_year,
-          [student_master].ssid,
-       [student_master].first_name,
-       [student_master].last_name,
-          [student_enrollment].grade_level,
-          [student_test].test_overall_score,
-          [test_program].test_program_desc
-    FROM   [Success_2012].[dbo].[student_test]
-          INNER JOIN [Success_2012].[dbo]. [student_enrollment]
-                  ON [Success_2012].[dbo].[student_test].[student_id] =
-                                [Success_2012].[dbo]. [student_enrollment].[student_id]
-                      AND [Success_2012].[dbo].[student_test].school_year =
-                          [Success_2012].[dbo]. [student_enrollment].school_year
-                      AND [Success_2012].[dbo].[student_test].school_number =
-                          [Success_2012].[dbo]. [student_enrollment].school_number
-          INNER JOIN [Success_2012].[dbo].[student_master]
-                  ON [Success_2012].[dbo].[student_test].[student_id] =
-                      [Success_2012].[dbo] . [student_master].[student_id]
-          INNER JOIN [Success_2012].[dbo].[test_program]
-                  ON [Success_2012].[dbo].[student_test].[test_prog_id] =
-                                [Success_2012] .[dbo]. [test_program].[test_prog_id]
-                      AND [Success_2012].[dbo].[student_test].test_overall_score != 0
-                      AND [Success_2012].[dbo].[student_test].test_overall_score IS NOT
-                          NULL
-UNION
-    SELECT [student_test].student_test_id,
-          [student_test].school_year,
-          [student_master].ssid,
-       [student_master].first_name,
-       [student_master].last_name,
-          [student_enrollment].grade_level,
-          [student_test].test_overall_score,
-          [test_program].test_program_desc
-    FROM   [Success_2013].[dbo].[student_test]
-          INNER JOIN [Success_2013].[dbo]. [student_enrollment]
-                  ON [Success_2013].[dbo].[student_test].[student_id] =
-                                [Success_2013].[dbo]. [student_enrollment].[student_id]
-                      AND [Success_2013].[dbo].[student_test].school_year =
-                          [Success_2013].[dbo]. [student_enrollment].school_year
-                      AND [Success_2013].[dbo].[student_test].school_number =
-                          [Success_2013].[dbo]. [student_enrollment].school_number
-          INNER JOIN [Success_2013].[dbo].[student_master]
-                  ON [Success_2013].[dbo].[student_test].[student_id] =
-                      [Success_2013].[dbo] . [student_master].[student_id]
-          INNER JOIN [Success_2013].[dbo].[test_program]
-                  ON [Success_2013].[dbo].[student_test].[test_prog_id] =
-                                [Success_2013] .[dbo]. [test_program].[test_prog_id]
-                      AND [Success_2013].[dbo].[student_test].test_overall_score != 0
-                      AND [Success_2013].[dbo].[student_test].test_overall_score IS NOT
-                          NULL
-
+    WHERE [test_program].test_program_desc = 'Algebra I'
   `);
 }
 

@@ -47,16 +47,21 @@ function testResultsTransform(config, observable) {
         item);
 
       return Observable.zip(
-        studentNumberToStudentId(item['Student Primary ID'], item),
+        studentNumberToStudentId(item['Student Primary ID'], item).do(x => console.log('x == ', x)),
         matchingTestScore,
 
-        (studentId, matchingTest) => ({
-          studentId: studentId,
-          matchingTestScore: matchingTest
-        })
+        (studentId, matchingTest) => {
+          console.log('studentId == ', studentId);
+          console.log('matchingTest == ', matchingTest);
+          return {
+            studentId: studentId,
+            matchingTestScore: matchingTest
+          };
+        }
       );
     })
     .map(item => {
+      console.log('item == ', item);
       return {
         'Test Date': item.config.testConstants.ROGL_Begin_Year.testDate,
         'Student Id': item.studentId,
@@ -130,8 +135,8 @@ function createTransformer(config, sourceObservable) {
 /**
  * maps objects emitted by srcObservable to a new Observable that
  * converts those objects to csv strings and emits the results
- * 
- * @param  {object}     config 
+ *
+ * @param  {object}     config
  * @param  {Observable} srcObservable
  * @return {Disposable}
  */
@@ -140,6 +145,7 @@ function csvObservable(config, srcObservable) {
   let csvObservable = srcObservable.concatMap(async function (item, i) {
     if (i === 0) {
       let outputFilename = `output/rogl/${basename(config.inputFile, extname(config.inputFile)) }-${config.prompt.table}${extname(config.inputFile) }`;
+      console.log(outputFilename);
 
       // creates file if it doesn't exist
       ws = createWriteStream(outputFilename, {
@@ -158,6 +164,7 @@ function csvObservable(config, srcObservable) {
 
         // Add a newline character before every line except the first line
         let csv = i === 0 ? csvRemQuotes : EOL + csvRemQuotes;
+        console.log('csv == ' + csv);
         return csv;
       });
   });

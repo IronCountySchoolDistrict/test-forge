@@ -5,20 +5,57 @@ import {
   getStudentIdFromStudentNumber,
   getTestFromName,
   getMatchingStudentTestScore,
-  getMatchingProficiency
-}
-from './service';
-import { printObj } from './util';
-import { logger } from './index';
-import { Observable } from '@reactivex/rxjs';
+  getMatchingProficiency,
+  getStudentIdsFromSsidBatchDual
+} from './service';
+import cache from 'memory-cache';
+import {printObj} from './util';
+import {logger} from './index';
+import {Observable} from '@reactivex/rxjs';
+import {merge} from 'lodash';
 
 function logErrors(item, msg, e) {
   logger.log('info', msg, {
     psDbError: printObj(e)
   });
-  logger.log('info', 'Source Data Record: ', {
-    sourceData: printObj(item)
-  });
+  if (item) {
+    logger.log('info', 'Source Data Record: ', {
+      sourceData: printObj(item)
+    });
+  }
+}
+
+/**
+ *
+ * @param ssids {array}
+ */
+export function ssidsToStudentIds(ssids) {
+  return Observable.fromPromise(getStudentIdsFromSsidBatchDual(ssids))
+    .flatMap(studentIds => {
+      const mergedStudentIds = ssids
+        .map(ssid => {
+          const matchingStudentIdItem = studentIds.rows.filter(studentId => {
+            return parseInt(studentId.SSID) === ssid
+          });
+          if (matchingStudentIdItem.length) {
+            return {
+              ssid: ssid,
+              studentId: matchingStudentIdItem[0].STUDENT_ID,
+              studentNumber: matchingStudentIdItem[0].STUDENT_NUMBER
+            };
+          } else {
+            let errorObj = {
+              error: new Error(`Expected to find a student's ssid from Powerschool that matches an ssid from the source database.`),
+              ssid: ssid
+            };
+            logErrors(null, `Error: `, errorObj);
+            return null;
+          }
+        })
+        .filter(item => !!item);
+      //mergedArray still contains null elements that should be filtered
+      return Observable.of(mergedStudentIds);
+    })
 }
 
 export function ssidToStudentNumber(ssid, item) {
@@ -42,7 +79,7 @@ export function ssidToStudentNumber(ssid, item) {
     })
     .catch(e => {
       logErrors(item, `Error fetching student number for ssid: ${item.ssid}`, e);
-      return Observable.of({});
+      return Observable.of(0);
     })
     .filter(studentNumber => !!studentNumber);
 }
@@ -68,7 +105,7 @@ export function ssidToStudentId(ssid, item) {
     })
     .catch(e => {
       logErrors(item, `Error fetching student id for ssid: ${item.ssid}`, e);
-      return Observable.of({});
+      return Observable.of(0);
     })
     .filter(studentId => !!studentId);
 }
@@ -94,29 +131,36 @@ export function studentNumberToStudentId(studentNumber, item) {
     })
     .catch(e => {
       logErrors(item, `Error fetching student id for ssid: ${item.ssid}`, e);
-      return Observable.of({});
+      return Observable.of(null);
     })
     .filter(studentId => !!studentId);
 }
 
 export function testNameToDcid(testName, item) {
-  return Observable.fromPromise(getTestFromName(`EOL - ${testName}`))
-    .map(matchingTests => {
-      if (!(matchingTests.rows.length === 1)) {
-        throw {
-          studentTestScore: matchingTests,
-          testResult: item,
-          message: `expected getTestFromName to return 1 record, got ${matchingTests.rows.length} rows`
-        };
-      } else {
-        return matchingTests.rows[0].ID
-      }
-    })
-    .catch(e => {
-      logErrors(item, `Error finding matching test in PowerSchool for test name: EOL - ${item.TestName}`, e);
-      return Observable.of(0);
-    })
-    .filter(matchingTest => !!matchingTest);
+  let cachedTestDcid = cache.get(`EOL - ${testName}`);
+  if (cachedTestDcid) {
+    return Observable.of(cachedTestDcid);
+  } else {
+    let fullTestName = `EOL - ${testName}`;
+    return Observable.fromPromise(getTestFromName(fullTestName))
+      .map(matchingTests => {
+        if (!(matchingTests.rows.length === 1)) {
+          throw {
+            studentTestScore: matchingTests,
+            testResult: item,
+            message: `expected getTestFromName to return 1 record, got ${matchingTests.rows.length} rows`
+          };
+        } else {
+          cache.put(`EOL - ${testName}`, matchingTests.rows[0].ID);
+          return matchingTests.rows[0].ID;
+        }
+      })
+      .catch(e => {
+        logErrors(item, `Error finding matching test in PowerSchool for test name: ${fullTestName}`, e);
+        return Observable.of(null);
+      })
+      .filter(matchingTest => !!matchingTest);
+  }
 }
 
 /**
@@ -125,12 +169,12 @@ export function testNameToDcid(testName, item) {
  */
 export function studentTestScoreDuplicateCheck(studentNumber, fullSchoolYear, testScore, testId, item) {
   return Observable.fromPromise(
-      getMatchingStudentTestScore(
-        studentNumber,
-        fullSchoolYear,
-        testScore,
-        testId
-      )
+    getMatchingStudentTestScore(
+      studentNumber,
+      fullSchoolYear,
+      testScore,
+      testId
+    )
     )
     .map(studentTestScore => {
       // Expecting there to NOT be any matching student test score record,
@@ -155,12 +199,12 @@ export function studentTestScoreDuplicateCheck(studentNumber, fullSchoolYear, te
 
 export function proficiencyDuplicateCheck(studentNumber, fullSchoolYear, testScore, testId, item) {
   return Observable.fromPromise(
-      getMatchingProficiency(
-        studentNumber,
-        fullSchoolYear,
-        testScore,
-        testId
-      )
+    getMatchingProficiency(
+      studentNumber,
+      fullSchoolYear,
+      testScore,
+      testId
+    )
     )
     .map(proficiency => {
       if (proficiency.rows.length) {
@@ -185,12 +229,12 @@ export function proficiencyDuplicateCheck(studentNumber, fullSchoolYear, testSco
 
 export function testRecordToMatchingDcid(studentNumber, fullSchoolYear, testScore, testId, item) {
   return Observable.fromPromise(
-      getMatchingStudentTestScore(
-        studentNumber,
-        fullSchoolYear,
-        testScore,
-        testId
-      )
+    getMatchingStudentTestScore(
+      studentNumber,
+      fullSchoolYear,
+      testScore,
+      testId
+    )
     )
     .map(studentTestScore => {
       // Expecting there to NOT be any matching student test score record,

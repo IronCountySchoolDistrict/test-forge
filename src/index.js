@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-
 Error.stackTraceLimit = Infinity;
 require('babel-polyfill');
 
@@ -27,8 +26,12 @@ var Promise = Bluebird;
  * @return {object}
  */
 async function getConfig() {
-  let rawConfig = await fs.readFile('config.json');
-  return JSON.parse(rawConfig);
+  try {
+    let rawConfig = await fs.readFile('config.json');
+    return JSON.parse(rawConfig);
+  } catch(e) {
+    console.error(e.stack);
+  }
 }
 
 /**
@@ -52,7 +55,6 @@ function asyncCsvParse(str, options) {
 }
 
 async function main() {
-  
   // Set Globals
   logger = new winston.Logger({
     transports: [
@@ -66,7 +68,7 @@ async function main() {
   logger.log('info', `starting up test-forge`);
   config = await getConfig();
   oraWrapInst = await setOrawrapConfig();
-  
+
   let jsonPackage = await getPackage();
   program
     .version(jsonPackage.version)
@@ -76,12 +78,14 @@ async function main() {
     .option('-t, --test [value]', 'Specify which test to create test data for (only used when using database as source)')
     .command('import [file]')
     .action(file => {
+
       try {
         if (program.database && file) {
           throw new Error(`Expected either a database or file to be given, was given both: database == ${program.database}, file == ${file}`);
         } else if (file) {
           promptHandlerFile(createCsvObservable(file), file);
         } else if (program.database && program.test && program.test === 'CRT') {
+          console.log('in database prompt handler sams');
           promptHandlerSams(program.test);
         }
       } catch (e) {

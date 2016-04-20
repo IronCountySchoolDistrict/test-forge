@@ -13,16 +13,7 @@ import { getMatchingTests, getTestFromName, getCrtTestResults, getCrtProficiency
 
 var toCSV = Bluebird.promisify(json2csv);
 
-function asyncPrompt(questions) {
-  return new Promise((resolve, reject) => {
-    prompt(questions, function (answers) {
-      resolve(answers);
-    });
-  });
-}
-
 async function promptTestId(test) {
-  console.log('test == ', test)
   let matchingTests = await getMatchingTests(test.name);
   let testChoices = matchingTests.rows.map(test => ({
     name: test.NAME,
@@ -30,14 +21,15 @@ async function promptTestId(test) {
   }));
   let testQuestion = {
     type: 'list',
-    name: 'id',
+    name: 'testId',
     message: 'Which test would you like to use for the import?',
     choices: testChoices
   };
 
-  let importTest = await asyncPrompt(testQuestion);
-  console.log(`Using test with id: ${importTest.id}`);
-  return importTest.id;
+  let importTest = await prompt([testQuestion]);
+
+  console.log(`Using test with id: ${importTest.testId}`);
+  return importTest.testId;
 }
 
 async function promptTable() {
@@ -58,7 +50,7 @@ async function promptTable() {
     ]
   };
 
-  let importTable = await asyncPrompt(importQuestion);
+  let importTable = await prompt([importQuestion]);
   console.log(`Creating test data for table/data set: ${importTable.table}`);
   return importTable.table;
 }
@@ -66,7 +58,6 @@ async function promptTable() {
 export async function promptHandlerFile(source, file) {
   try {
     source.take(1).subscribe(async function(csvData) {
-      console.log('csvData == ', csvData);
       let test = detect(csvData);
 
       if (test.name === 'ROGL') {
@@ -113,7 +104,7 @@ export async function promptHandlerSams(test) {
         }]
     };
 
-    let table = await asyncPrompt(importQuestion);
+    let table = await prompt([importQuestion]);
     console.log(`Creating test data for table: ${table.table}`);
     let promptResps = {
       table: table.table
@@ -126,7 +117,7 @@ export async function promptHandlerSams(test) {
       source = await getCrtProficiency();
     }
     source.count().subscribe(x => console.log('count == ', x));
-    
+
     let workflow = crt.createWorkflow(source, promptResps);
     workflow.start();
   } catch (e) {

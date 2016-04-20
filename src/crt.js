@@ -1,24 +1,27 @@
 require('babel-polyfill');
 
-import { createWriteStream, truncateSync } from 'fs';
+import {createWriteStream, truncateSync} from 'fs';
 import Promise from 'bluebird';
 import fs from 'fs-promise';
-import { Observable } from '@reactivex/rxjs';
-import { isEmpty } from 'lodash';
-import { gustav } from 'gustav';
+import {Observable} from '@reactivex/rxjs';
+import {isEmpty} from 'lodash';
+import {gustav} from 'gustav';
 import json2csv from 'json2csv';
-import { EOL } from 'os';
+import {EOL} from 'os';
+import {merge, uniq} from 'lodash';
 
 import {
   ssidToStudentId,
   ssidToStudentNumber,
   testRecordToMatchingDcid,
   testNameToDcid,
-  studentTestScoreDuplicateCheck
+  studentTestScoreDuplicateCheck,
+  ssidsToStudentIds
 }
-from './blogic';
-import { logger } from './index';
-import { printObj } from './util';
+  from './blogic';
+import {getStudentIdsFromSsidBatch} from './service';
+import {logger} from './index';
+import {printObj} from './util';
 
 var toCSV = Promise.promisify(json2csv);
 
@@ -33,6 +36,7 @@ export function createWorkflow(sourceObservable, prompt) {
     .source('dataSource')
     .transf(transformer, config)
     .sink(crtCsvSink, config);
+  // .sink(consoleNode);
 }
 
 function transformer(config, observer) {
@@ -51,33 +55,61 @@ function testResultsTransform(observer) {
       // If item.test_program_desc is spelled wrong, replace that value with the correctly spelled value
       item.test_program_desc = item.test_program_desc === 'Earth Sytems Science' ? 'Earth Systems Science' : item.test_program_desc;
       item.test_date = new Date(`05/01/${item.school_year}`)
-      .toLocaleDateString();
+        .toLocaleDateString();
       if (item.test_program_desc === 'Algebra 1') {
         item.test_program_desc = 'Algebra I';
-      } else if (item.item_program_desc === 'Algebra 2') {
+      } else if (item.test_program_desc === 'Algebra 2') {
         item.test_program_desc = 'Algebra II';
       }
       return item;
     })
-    .flatMap(item => {
-      return Observable.zip(
-        ssidToStudentNumber(item.ssid, item),
-        ssidToStudentId(item.ssid, item),
-        testNameToDcid(item.test_program_desc, item),
+    .bufferCount(500)
+    .flatMap(bufferedItems => {
+      let distinctSsids = bufferedItems.reduce((prev, curr) => {
+        prev.push(curr.ssid);
+        return prev;
+      }, []);
+      distinctSsids = uniq(distinctSsids);
 
-        (studentNumber, studentId, matchingTest) => ({
-          studentNumber: studentNumber,
-          studentId: studentId,
-          matchingTestId: matchingTest,
-          testResult: item
-        })
+      return Observable.zip(
+        ssidsToStudentIds(distinctSsids),
+
+        (studentIds) => {
+          return bufferedItems
+            .map(bufferedItem => {
+              const matchingStudentIdItem = studentIds.filter(studentId => studentId.ssid === bufferedItem.ssid);
+              if (matchingStudentIdItem.length) {
+                bufferedItem.studentId = matchingStudentIdItem[0].studentId;
+                bufferedItem.studentNumber = matchingStudentIdItem[0].studentNumber;
+                return bufferedItem;
+              } else {
+                return null;
+              }
+            })
+            .filter(item => !!item);
+        }
       );
     })
     .flatMap(item => {
-      let fullSchoolYear = toFullSchoolYear(item.testResult.school_year);
+      return Observable.from(item);
+    })
+    .flatMap(item => {
+      return Observable.zip(
+        testNameToDcid(item.test_program_desc, item),
+
+        (matchingTest) => {
+          return {
+            matchingTestId: matchingTest,
+            testResult: item
+          };
+        }
+      );
+    })
+    .flatMap(item => {
+      let fullSchoolYear = toFullSchoolYear(item.school_year);
 
       let matchingTestScore = studentTestScoreDuplicateCheck(
-        item.studentNumber,
+        item.testResult.studentNumber,
         fullSchoolYear,
         item.testResult.test_overall_score,
         item.matchingTestId,
@@ -88,8 +120,8 @@ function testResultsTransform(observer) {
         .map(_ => ({
           csvOutput: {
             'Test Date': item.testResult.test_date,
-            'Student Id': item.studentId,
-            'Student Number': item.studentNumber,
+            'Student Id': item.testResult.studentId,
+            'Student Number': item.testResult.studentNumber,
             'Grade Level': item.testResult.grade_level,
             'Composite Score Num': item.testResult.test_overall_score
           },
@@ -99,6 +131,7 @@ function testResultsTransform(observer) {
           }
         }));
     });
+
 }
 
 function proficiencyTransform(observer) {
@@ -127,7 +160,6 @@ function proficiencyTransform(observer) {
       );
     })
     .flatMap(item => {
-
       let fullSchoolYear = toFullSchoolYear(item.testResult.school_year);
       let matchingTestScore = testRecordToMatchingDcid(
         item.studentNumber,
@@ -160,11 +192,10 @@ function toFullSchoolYear(shortSchoolYear) {
   return `${shortSchoolYear - 1}-${shortSchoolYear}`;
 }
 
-function consoleNode(observer) {
-  observer.subscribe(x => {
+function consoleNode(observable) {
+  return observable.subscribe(x => {
     console.log('in consoleNode');
     console.dir(x);
-    console.log(`x == ${x}`);
   });
 }
 
@@ -172,27 +203,25 @@ function crtCsvSink(config, observable) {
   return observable
     .groupBy(x => x.extra.testProgramDesc)
     .subscribe(groupedObservable => {
-
       let ws;
       toCsvObservable(config, groupedObservable)
-      .subscribe(
-        item => {
-          if (!ws && item.ws) {
-            ws = item.ws;
+        .subscribe(
+          item => {
+            if (!ws && item.ws) {
+              ws = item.ws;
+            }
+            ws.write(item.csv);
+          },
+
+          error => console.log('error == ', error),
+
+          () => {
+            console.log('close writestream');
+            ws.end();
           }
-          ws.write(item.csv);
-        },
-
-        error => console.log('error == ', error),
-
-        () => {
-          console.log('close writestream');
-          ws.end();
-        }
-      );
+        );
     });
 }
-
 
 
 /**
@@ -207,6 +236,9 @@ function crtCsvSink(config, observable) {
  */
 function toCsvObservable(config, srcObservable) {
   return srcObservable.concatMap(function (item, i) {
+    if (!item.csvOutput['Student Id']) {
+      console.log('found record that does not have student id:', item);
+    }
     if (i === 0) {
       let outputFilename = `output/crt/EOL - ${item.extra.testProgramDesc}-${config.prompt.table}.txt`;
 
@@ -225,10 +257,10 @@ function toCsvObservable(config, srcObservable) {
       }
     }
     return toCSV({
-        data: item.csvOutput,
-        del: '\t',
-        hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
-      })
+      data: item.csvOutput,
+      del: '\t',
+      hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
+    })
       .then(csvStr => {
         let csvRemQuotes = csvStr.replace(/"/g, '');
 

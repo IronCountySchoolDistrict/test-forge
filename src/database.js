@@ -45,7 +45,6 @@ export function execute(sql, bind, opts) {
       resolve(results);
     };
     args.push(cb);
-
     //global orawrap instance created in index.js
     try {
       oraWrapInst.execute.apply(orawrap, args);
@@ -58,7 +57,7 @@ export function execute(sql, bind, opts) {
 export function msExecute(sql) {
   console.log('in msExecute Observable');
   return new Observable(observer => {
-    config.database.sams.requestTimeout = 60000;
+    config.database.sams.requestTimeout = 600000;
     
     var connection = new mssql.Connection(config.database.sams, err => {
       var request = new mssql.Request(connection);
