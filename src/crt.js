@@ -2,7 +2,6 @@ require('babel-polyfill');
 
 import {createWriteStream, truncateSync} from 'fs';
 import Promise from 'bluebird';
-import fs from 'fs-promise';
 import {Observable} from '@reactivex/rxjs';
 import {isEmpty} from 'lodash';
 import {gustav} from 'gustav';
@@ -11,7 +10,6 @@ import {EOL} from 'os';
 import {merge, uniq} from 'lodash';
 
 import {
-  ssidToStudentId,
   ssidToStudentNumber,
   testRecordToMatchingDcid,
   testNameToDcid,
@@ -83,10 +81,15 @@ function testResultsTransform(observer) {
                 bufferedItem.studentNumber = matchingStudentIdItem[0].studentNumber;
                 return bufferedItem;
               } else {
-                return null;
+                bufferedItem.studentId = null;
+                bufferedItem.studentNumber = null;
+                return bufferedItem;
               }
             })
-            .filter(item => !!item);
+            .filter(item => {
+              console.log('item == ', item);
+              return !!item.studentId || !!item.studentNumber;
+            });
         }
       );
     })
