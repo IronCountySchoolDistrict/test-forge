@@ -1,11 +1,18 @@
 // Collection of database queries
 import Promise from 'bluebird';
 import orawrap from 'orawrap';
-import {Observable} from '@reactivex/rxjs';
+import {
+  Observable
+} from '@reactivex/rxjs';
 import cache from 'memory-cache';
 
-import {execute, msExecute} from './database';
-import {logger} from './index';
+import {
+  execute,
+  msExecute
+} from './database';
+import {
+  logger
+} from './index';
 
 export function getMatchingStudentTest(studentNumber, termName, testId) {
   return execute(`
@@ -95,9 +102,9 @@ export function getTestFromName(searchTerm) {
     FROM test
     WHERE name = :searchTerm
     `, [searchTerm], {
-    outFormat: orawrap.OBJECT,
-    maxRows: 1
-  })
+      outFormat: orawrap.OBJECT,
+      maxRows: 1
+    })
     .then(result => {
       console.timeEnd(rnd);
       return result;
@@ -128,10 +135,9 @@ export function getStudentIdsFromSsidBatch(ssids) {
       state_studentnumber,
       student_number
     FROM students
-    WHERE state_studentnumber IN (:ssids)`,
-    [ssids.join(',')],
-    {outFormat: orawrap.OBJECT}
-  );
+    WHERE state_studentnumber IN (:ssids)`, [ssids.join(',')], {
+    outFormat: orawrap.OBJECT
+  });
 }
 
 export function getStudentIdsFromSsidBatchDual(ssids) {
@@ -150,15 +156,16 @@ export function getStudentIdsFromSsidBatchDual(ssids) {
                           :ssids,
                           '[^,]+', 1, level) IS NOT NULL
     ) ssid_input
-    LEFT JOIN students ON students.state_studentnumber = ssid_input.ssid`,
-      {
-        ssids: {val: ssids.join(','), dir: orawrap.BIND_IN, type: orawrap.STRING}
-      },
-      {
-        outFormat: orawrap.OBJECT,
-        maxRows: ssids.length
+    LEFT JOIN students ON students.state_studentnumber = ssid_input.ssid`, {
+      ssids: {
+        val: ssids.join(','),
+        dir: orawrap.BIND_IN,
+        type: orawrap.STRING
       }
-    );
+    }, {
+      outFormat: orawrap.OBJECT,
+      maxRows: ssids.length
+    });
   } catch (e) {
     console.error(e);
   }
@@ -198,9 +205,43 @@ export function getStudentNumberFromSsid(ssid) {
   });
 }
 
+export function createTestScore(testId, name, description) {
+  return execute(`
+    INSERT INTO TestScore (dcid, id, testid, name, description, sortorder)
+    SELECT
+      TESTSCORE_DCID_SQ.nextval,
+      TESTSCORE_ID_SQ.nextval,
+      :testid,
+      :name,
+      :description,
+      (SELECT max(sortorder) + 1
+       FROM testscore
+       WHERE testid = :testid)
+    FROM DUAL
+  `, {
+    testId: {
+      val: testId,
+      dir: orawrap.BIND_IN,
+      type: orawrap.NUMBER
+    },
+    name: {
+      val: name,
+      dir: orawrap.BIND_IN,
+      type: orawrap.STRING
+    },
+    description: {
+      val: description,
+      dir: orawrap.BIND_IN,
+      type: orawrap.STRING
+    }
+  }, {
+    outFormat: orawrap.OBJECT
+  });
+}
+
 export function getCrtTestResults() {
   return msExecute(`
-    SELECT 
+    SELECT
        [student_test].school_year,
        [student_master].ssid,
        [student_enrollment].grade_level,
@@ -224,7 +265,7 @@ export function getCrtTestResults() {
                       AND [sams_2008].[dbo].[student_test].test_overall_score IS NOT
                           NULL
     UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -248,7 +289,7 @@ export function getCrtTestResults() {
                       AND [sams_2009].[dbo].[student_test].test_overall_score IS NOT
                           NULL
     UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -272,7 +313,7 @@ export function getCrtTestResults() {
                       AND [sams_2010].[dbo].[student_test].test_overall_score IS NOT
                           NULL
     UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -296,7 +337,7 @@ export function getCrtTestResults() {
                       AND [sams_2011].[dbo].[student_test].test_overall_score IS NOT
                           NULL
     UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -320,7 +361,7 @@ export function getCrtTestResults() {
                       AND [sams_2012].[dbo].[student_test].test_overall_score IS NOT
                           NULL
     UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -344,7 +385,7 @@ export function getCrtTestResults() {
                       AND [sams_2013].[dbo].[student_test].test_overall_score IS NOT
                           NULL
     UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -368,7 +409,7 @@ export function getCrtTestResults() {
                       AND [sams_merge].[dbo].[student_test].test_overall_score IS NOT
                           NULL
 UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -392,7 +433,7 @@ UNION
                       AND [Success_2008].[dbo].[student_test].test_overall_score IS NOT
                           NULL
 UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -416,7 +457,7 @@ UNION
                       AND [Success_2009].[dbo].[student_test].test_overall_score IS NOT
                           NULL
 UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -440,7 +481,7 @@ UNION
                       AND [Success_2010].[dbo].[student_test].test_overall_score IS NOT
                           NULL
 UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -464,7 +505,7 @@ UNION
                       AND [Success_2011].[dbo].[student_test].test_overall_score IS NOT
                           NULL
 UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -488,7 +529,7 @@ UNION
                       AND [Success_2012].[dbo].[student_test].test_overall_score IS NOT
                           NULL
 UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -516,7 +557,7 @@ UNION
 
 export function getCrtProficiency() {
   return msExecute(`
-    SELECT 
+    SELECT
        [student_test].school_year,
        [student_master].ssid,
        [student_enrollment].grade_level,
@@ -541,7 +582,7 @@ export function getCrtProficiency() {
                       AND [sams_2008].[dbo].[student_test].test_overall_score IS NOT
                           NULL
     UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -566,7 +607,7 @@ export function getCrtProficiency() {
                       AND [sams_2009].[dbo].[student_test].test_overall_score IS NOT
                           NULL
     UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -591,7 +632,7 @@ export function getCrtProficiency() {
                       AND [sams_2010].[dbo].[student_test].test_overall_score IS NOT
                           NULL
     UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -616,7 +657,7 @@ export function getCrtProficiency() {
                       AND [sams_2011].[dbo].[student_test].test_overall_score IS NOT
                           NULL
     UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -641,7 +682,7 @@ export function getCrtProficiency() {
                       AND [sams_2012].[dbo].[student_test].test_overall_score IS NOT
                           NULL
     UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -666,7 +707,7 @@ export function getCrtProficiency() {
                       AND [sams_2013].[dbo].[student_test].test_overall_score IS NOT
                           NULL
     UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -691,7 +732,7 @@ export function getCrtProficiency() {
                       AND [sams_merge].[dbo].[student_test].test_overall_score IS NOT
                           NULL
 UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -716,7 +757,7 @@ UNION
                       AND [Success_2008].[dbo].[student_test].test_overall_score IS NOT
                           NULL
 UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -766,7 +807,7 @@ UNION
                       AND [Success_2010].[dbo].[student_test].test_overall_score IS NOT
                           NULL
 UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
@@ -791,7 +832,7 @@ UNION
                       AND [Success_2011].[dbo].[student_test].test_overall_score IS NOT
                           NULL
 UNION
-    SELECT 
+    SELECT
           [student_test].school_year,
           [student_master].ssid,
           [student_enrollment].grade_level,
