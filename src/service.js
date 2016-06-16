@@ -121,6 +121,27 @@ export function getMatchingTests(searchTerm) {
   });
 }
 
+/**
+ *
+ * @param  {array} testNames test.name
+ * @return {Promise}
+ */
+export function getTestIdsFromNamesBatch(testNames) {
+  return execute(`
+    SELECT
+      test_input.test_name,
+      test.id
+    FROM (
+           SELECT REGEXP_SUBSTR(:test_names, '[^,]+', 1, level) AS test_name
+           FROM dual
+           CONNECT BY REGEXP_SUBSTR(:test_names, '[^,]+', 1, level) IS NOT NULL
+         ) test_input
+      JOIN test ON test_input.test_name = test.name
+    `, [testNames.join(',')], {
+    outFormat: orawrap.OBJECT
+  });
+}
+
 export function getTestDcid(testId) {
   return execute(`
     SELECT dcid FROM test WHERE id=:testId
@@ -408,7 +429,7 @@ export function getCrtTestResults() {
                       AND [sams_merge].[dbo].[student_test].test_overall_score != 0
                       AND [sams_merge].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-UNION
+    UNION
     SELECT
           [student_test].school_year,
           [student_master].ssid,
@@ -432,7 +453,7 @@ UNION
                       AND [Success_2008].[dbo].[student_test].test_overall_score != 0
                       AND [Success_2008].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-UNION
+    UNION
     SELECT
           [student_test].school_year,
           [student_master].ssid,
@@ -456,7 +477,7 @@ UNION
                       AND [Success_2009].[dbo].[student_test].test_overall_score != 0
                       AND [Success_2009].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-UNION
+    UNION
     SELECT
           [student_test].school_year,
           [student_master].ssid,
@@ -480,7 +501,7 @@ UNION
                       AND [Success_2010].[dbo].[student_test].test_overall_score != 0
                       AND [Success_2010].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-UNION
+    UNION
     SELECT
           [student_test].school_year,
           [student_master].ssid,
@@ -504,7 +525,7 @@ UNION
                       AND [Success_2011].[dbo].[student_test].test_overall_score != 0
                       AND [Success_2011].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-UNION
+    UNION
     SELECT
           [student_test].school_year,
           [student_master].ssid,
@@ -528,7 +549,7 @@ UNION
                       AND [Success_2012].[dbo].[student_test].test_overall_score != 0
                       AND [Success_2012].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-UNION
+    UNION
     SELECT
           [student_test].school_year,
           [student_master].ssid,
@@ -731,7 +752,7 @@ export function getCrtProficiency() {
                       AND [sams_merge].[dbo].[student_test].test_overall_score != 0
                       AND [sams_merge].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-UNION
+    UNION
     SELECT
           [student_test].school_year,
           [student_master].ssid,
@@ -756,7 +777,7 @@ UNION
                       AND [Success_2008].[dbo].[student_test].test_overall_score != 0
                       AND [Success_2008].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-UNION
+    UNION
     SELECT
           [student_test].school_year,
           [student_master].ssid,
@@ -781,7 +802,7 @@ UNION
                       AND [Success_2009].[dbo].[student_test].test_overall_score != 0
                       AND [Success_2009].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-UNION
+    UNION
     SELECT
           [student_test].school_year,
           [student_master].ssid,
@@ -806,7 +827,7 @@ UNION
                       AND [Success_2010].[dbo].[student_test].test_overall_score != 0
                       AND [Success_2010].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-UNION
+    UNION
     SELECT
           [student_test].school_year,
           [student_master].ssid,
@@ -831,7 +852,7 @@ UNION
                       AND [Success_2011].[dbo].[student_test].test_overall_score != 0
                       AND [Success_2011].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-UNION
+    UNION
     SELECT
           [student_test].school_year,
           [student_master].ssid,
@@ -856,7 +877,7 @@ UNION
                       AND [Success_2012].[dbo].[student_test].test_overall_score != 0
                       AND [Success_2012].[dbo].[student_test].test_overall_score IS NOT
                           NULL
-UNION
+    UNION
     SELECT
           [student_test].school_year,
           [student_master].ssid,
@@ -881,5 +902,17 @@ UNION
                       AND [Success_2013].[dbo].[student_test].test_overall_score != 0
                       AND [Success_2013].[dbo].[student_test].test_overall_score IS NOT
                           NULL
+  `);
+}
+
+export function getCrtTestScores() {
+  return msExecute(`
+    SELECT
+      DISTINCT
+      test_program_desc,
+      test_concept.concept_desc
+    FROM test_concept
+      JOIN test_program ON test_concept.test_prog_id = test_program.test_prog_id
+      JOIN student_test ON test_program.test_prog_id = student_test.test_prog_id
   `);
 }

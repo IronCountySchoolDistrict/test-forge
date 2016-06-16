@@ -12,7 +12,7 @@ import { zipObject } from 'lodash';
 import csv from 'csv';
 import Bluebird from 'bluebird';
 
-import { msExecute }   from './database';
+import { msExecute } from './database';
 import { promptHandlerFile, promptHandlerSams } from './prompt';
 import { setOrawrapConfig } from './database';
 

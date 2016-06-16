@@ -22,10 +22,7 @@ import {SamsCoupler} from './couplers/sams';
 import {PowerSchoolCoupler} from './couplers/powerschool';
 import {CsvCoupler} from './couplers/csv';
 
-var toCSV = Promise.promisify(json2csv);
-
 export function createWorkflow(prompt) {
-  console.log('prompt == ', prompt);
   gustav.addCoupler(new SamsCoupler());
   gustav.addCoupler(new PowerSchoolCoupler());
   gustav.addCoupler(new CsvCoupler());
@@ -112,7 +109,6 @@ function testResultsTransform(observer) {
               }
             })
             .filter(item => {
-              console.log('item == ', item);
               return !!item.studentId || !!item.studentNumber;
             });
         }
@@ -307,20 +303,19 @@ function crtTestScoresTransform(observer) {
       var distinctTestNames = [];
       var distinctItems = uniqWith(items, isEqual);
 
-      items.forEach(item => {
-        if (distinctTestNames.indexOf(item.test_program_desc) === -1) {
-          distinctTestNames.push(item.test_program_desc);
-        }
-      });
+      const distinctTestNames = uniqWith(items, (a, b) => a.test_program_desc === b.test_program_desc)
+        .map(item => item.test_program_desc)
+        .map(testProgramDesc => `EOL - ${testProgramDesc}`);
+
 
       return Observable.zip(
         Observable.fromPromise(getTestIdsFromNamesBatch(distinctTestNames)),
 
         testIds => {
           return distinctItems.map(item => {
-            let matchingTestId = testIds.rows.filter(testId => testId.TEST_NAME === item.test_program_desc);
+            let matchingTestId = testIds.rows.filter(testId => testId.TEST_NAME === `EOL - ${item.test_program_desc}`);
             if (matchingTestId.length) {
-              item.testId = matchingTestId[0].TEST_ID;
+              item.testId = matchingTestId[0].ID;
             }
             return item;
           });
@@ -340,9 +335,5 @@ function toFullSchoolYear(shortSchoolYear) {
 }
 
 function consoleNode(observable) {
-  return observable.subscribe(x => {
-    console.log('in consoleNode');
-    console.dir(x);
-  });
-}
+  return observable.subscribe(x => console.dir(x));
 }
