@@ -9,7 +9,7 @@ import detect from './detector';
 import * as sage from './sage';
 import * as crt from './crt';
 import * as dibels from './dibels';
-import { getMatchingTests, getTestFromName, getCrtTestResults, getCrtProficiency } from './service';
+import { getMatchingTests, getTestFromName, getCrtTestResults, getCrtProficiency, getCrtTestScores } from './service';
 
 var toCSV = Bluebird.promisify(json2csv);
 
@@ -96,29 +96,35 @@ export async function promptHandlerSams(test) {
           name: 'U_StudentTestProficiency',
           value: 'U_StudentTestProficiency'
         }, {
-          name: 'U_StudentTestSubscore',
-          value: 'U_StudentTestSubscore'
-        }, {
-          name: 'U_TestSubscore',
-          value: 'U_TestSubscore'
+          name: 'Test Scores',
+          value: 'Test Scores'
         }]
     };
 
-    let table = await prompt([importQuestion]);
-    console.log(`Creating test data for table: ${table.table}`);
-    let promptResps = {
-      table: table.table
+    let { table } = await prompt([importQuestion]);
+
+    let destQuestion = {
+      type: 'list',
+      name: 'dest',
+      message: 'Please choose the destination for your data',
+      choices: [{
+        name: 'CSV',
+        value: 'CSV'
+      }, {
+        name: 'Database',
+        value: 'Database'
+      }]
     };
 
-    let source;
-    if (promptResps.table === 'Test Results') {
-      source = await getCrtTestResults();
-    } else {
-      source = await getCrtProficiency();
-    }
-    source.count().subscribe(x => console.log('count == ', x));
+    let { dest } = await prompt([destQuestion]);
 
-    let workflow = crt.createWorkflow(source, promptResps);
+    let promptResps = {
+      table,
+      dest
+    };
+
+    const workflow = crt.createWorkflow(promptResps);
+
     workflow.start();
   } catch (e) {
     console.error(e.stack);
