@@ -5,9 +5,7 @@ import Promise from 'bluebird';
 import {Observable} from '@reactivex/rxjs';
 import {isEmpty} from 'lodash';
 import {gustav} from 'gustav';
-import json2csv from 'json2csv';
-import {EOL} from 'os';
-import {merge, uniq} from 'lodash';
+import {merge, uniq, uniqWith, isEqual} from 'lodash';
 
 import {
   ssidToStudentNumber,
@@ -17,32 +15,59 @@ import {
   ssidsToStudentIds
 }
   from './blogic';
-import {getStudentIdsFromSsidBatch} from './service';
+import {getStudentIdsFromSsidBatch, getTestIdsFromNamesBatch} from './service';
 import {logger} from './index';
 import {printObj} from './util';
+import {SamsCoupler} from './couplers/sams';
+import {PowerSchoolCoupler} from './couplers/powerschool';
+import {CsvCoupler} from './couplers/csv';
 
 var toCSV = Promise.promisify(json2csv);
 
-export function createWorkflow(sourceObservable, prompt) {
-  var config = {
-    prompt: prompt
-  };
+export function createWorkflow(prompt) {
+  console.log('prompt == ', prompt);
+  gustav.addCoupler(new SamsCoupler());
+  gustav.addCoupler(new PowerSchoolCoupler());
+  gustav.addCoupler(new CsvCoupler());
 
-  gustav.source('dataSource', () => sourceObservable);
+  let params = {};
+  if (prompt.dest === 'Database') {
+    params.coupler = 'powerschool';
+    params.channel = prompt.table;
+  } else if (prompt.dest === 'CSV') {
+    params.coupler = 'csv';
+    params.channel = {
+      prompt: prompt
+    };
+    if (prompt.table === 'Test Results') {
+      params.channel.groupByProperty = 'extra.testProgramDesc';
+      params.channel.outputProperty = 'csvOutput';
+    } else if (prompt.table === 'U_StudentTestProficiency') {
+      params.channel.groupByProperty = 'extra.testProgramDesc';
+      params.channel.outputProperty = 'csvOutput';
+    } else if (prompt.table === 'Test Scores') {
+      params.channel.groupByProperty = 'test_program_desc';
+      params.channel.outputProperty = ''; // use the entire object
+    }
+  }
 
-  return gustav.createWorkflow()
-    .source('dataSource')
-    .transf(transformer, config)
-    .sink(crtCsvSink, config);
-  // .sink(consoleNode);
+  const workflow = gustav.createWorkflow()
+    .from('sams', prompt.table)
+    .transf(transformer, prompt)
+    .to(...Object.keys(params).map(k => params[k]));
+
+  return workflow;
 }
 
 function transformer(config, observer) {
-  if (config.prompt.table === 'Test Results') {
+  if (config.table === 'Test Results') {
     return testResultsTransform(observer);
   }
-  if (config.prompt.table === 'U_StudentTestProficiency') {
+  if (config.table === 'U_StudentTestProficiency') {
     return proficiencyTransform(observer);
+  }
+  if (config.table === 'Test Scores') {
+    return crtTestScoresTransform(observer);
   }
 }
 
@@ -134,7 +159,6 @@ function testResultsTransform(observer) {
           }
         }));
     });
-
 }
 
 function proficiencyTransform(observer) {
@@ -185,6 +209,126 @@ function proficiencyTransform(observer) {
     });
 }
 
+function correctConceptDesc(conceptDesc) {
+  // remove roman numerals
+  conceptDesc = conceptDesc.replace(/^(X{0,3}\s+|IX\s+|IV\s+|V?I{0,3}\s*)/g, '');
+
+  // remove all dots
+  conceptDesc = conceptDesc.replace(/(\.)+$/g, '');
+
+  // remove all numbers at the beginning of concept_desc
+  conceptDesc = conceptDesc.replace(/^([0-9]+)\s+/g, '');
+
+  // remove all asterisks
+  conceptDesc = conceptDesc.replace(/(\*)+/ig, '');
+
+  // spelling corrections
+  conceptDesc = conceptDesc.replace(/(Comprhnsn)/ig, 'Comprehension');
+  conceptDesc = conceptDesc.replace(/(\band\b)/ig, '&');
+  conceptDesc = conceptDesc.replace(/(intgrted)/ig, 'integrated');
+  conceptDesc = conceptDesc.replace(/(Cycle As It Orbits Earth)/ig, 'Cycle As It Orbits The Earth');
+  conceptDesc = conceptDesc.replace(/(\bAmts\b)/ig, 'Amounts');
+  conceptDesc = conceptDesc.replace(/(Forms, But)/ig, 'Forms &');
+  conceptDesc = conceptDesc.replace(/(\bSpatial, )/ig, 'Spacial ');
+  conceptDesc = conceptDesc.replace(/(\bSituatio\b)/ig, 'Situations');
+  conceptDesc = conceptDesc.replace(/(Hydrosphere, Affects)/ig, 'Hydrosphere Affects');
+  conceptDesc = conceptDesc.replace(/(Environment & Humans Impact On)/ig, 'Environment & Human Impact On');
+  conceptDesc = conceptDesc.replace(/(Uplife,)/ig, 'Uplift,');
+  conceptDesc = conceptDesc.replace(/(Concepts From Statistics & Apply)/ig, 'Concepts From Probability & Statistics & Apply');
+  conceptDesc = conceptDesc.replace(/(Reasonable Conlusions)/ig, 'Reasonable Conclusions');
+  conceptDesc = conceptDesc.replace(/\b(\/)/g, ' /');
+  conceptDesc = conceptDesc.replace(/(\/)\b/g, '/ ');
+  conceptDesc = conceptDesc.replace(/(Force, Mass, &)/ig, 'Force, Mass &');
+  conceptDesc = conceptDesc.replace(/(Acclerations)/ig, 'Acceleration');
+  conceptDesc = conceptDesc.replace(/(Accelerations)/ig, 'Acceleration');
+  conceptDesc = conceptDesc.replace(/(& Application Of Waves)/ig, '& Applications Of Waves');
+  conceptDesc = conceptDesc.replace(/(Enviornment)/ig, 'Environment');
+  conceptDesc = conceptDesc.replace(/(Environmnet)/ig, 'Environment');
+  conceptDesc = conceptDesc.replace(/(Force, & Motion)/ig, 'Force & Motion');
+  conceptDesc = conceptDesc.replace(/(, & )/ig, ' & ');
+  conceptDesc = conceptDesc.replace(/(\bOrganismsof\b)/ig, 'Organism of');
+  conceptDesc = conceptDesc.replace(/\b(W \/)/ig, 'With');
+  conceptDesc = conceptDesc.replace(/(Language \/ Operations)/ig, 'Language & Operations');
+  conceptDesc = conceptDesc.replace(/(& Common Organism Of)/ig, '& Common Organisms Of');
+  conceptDesc = conceptDesc.replace(/(Organisms Of Utah Environments)/ig, 'Organisms Of Utah\'s Environment');
+  conceptDesc = conceptDesc.replace(/(Interact With On Another)/ig, 'Interact With One Another');
+  conceptDesc = conceptDesc.replace(/(With & Is Altered By Earth Layers|With & Is Altered By Earth\'s Layers)/ig, 'With & Is Altered By The Earth\'s Layers');
+  conceptDesc = conceptDesc.replace(/(Affect Living Systems, Earth Is Unique)/ig, 'Affect Living Systems & Earth Is Unique');
+  conceptDesc = conceptDesc.replace(/(Axiz)/ig, 'Axis');
+  conceptDesc = conceptDesc.replace(/(Earth\'s Revolving Environment Affect)/ig, 'Earth\'s Evolving Environment Affect');
+  conceptDesc = conceptDesc.replace(/(Earth\'s Plates & Causes Plates)/ig, 'Earth\'s Plates & Causes The Plates');
+  conceptDesc = conceptDesc.replace(/(As It Revolves Aroung The Sun)/ig, 'As It Revolves Around The Sun');
+  conceptDesc = conceptDesc.replace(/(Offsping)/ig, 'Offspring');
+  conceptDesc = conceptDesc.replace(/(Cells That Have Structures)/ig, 'Cells That Have Structure');
+  conceptDesc = conceptDesc.replace(/(Heat Light & Sound)/ig, 'Heat, Light & Sound');
+  conceptDesc = conceptDesc.replace(/(Nature Of Changes In Matter)/ig, 'Nature Of Change In Matter');
+  conceptDesc = conceptDesc.replace(/(Relationshi)/ig, 'Relationships');
+  conceptDesc = conceptDesc.replace(/(Effetively)/ig, 'Effectively');
+  conceptDesc = conceptDesc.replace(/(Diveristy)/ig, 'Diversity');
+  conceptDesc = conceptDesc.replace(/(Relationshipsp)/ig, 'Relationship');
+  conceptDesc = conceptDesc.replace(/(Sciene)/ig, 'Science');
+  conceptDesc = conceptDesc.replace(/(Demostrate)/ig, 'Demonstrate');
+  conceptDesc = conceptDesc.replace(/(Relationshipsps)/ig, 'Relationships');
+  conceptDesc = conceptDesc.replace(/(Albegra)/ig, 'Algebra');
+  conceptDesc = conceptDesc.replace(/(Nterpret)/ig, 'Interpret');
+  conceptDesc = conceptDesc.replace(/(Ocabulary)/ig, 'Vocabulary');
+  conceptDesc = conceptDesc.replace(/(Vvocabulary)/ig, 'Vocabulary');
+  conceptDesc = conceptDesc.replace(/(Determine Area & Surface Area Polygons)/ig, 'Determine Area Of Polygons & Surface Area');
+  conceptDesc = conceptDesc.replace(/(Factors Determining Strength Of Gravitational)/ig, 'Factors Determining The Strength Of Gravitational');
+  conceptDesc = conceptDesc.replace(/(Iinterpret)/ig, 'Interpret');
+  conceptDesc = conceptDesc.replace(/(Offspring Inherit Traits That Affect Survival In The Environment)/ig, 'Offspring Inherit Traits That Make Them More Or Less Suitable To Survive In The Environment');
+  conceptDesc = conceptDesc.replace(/(Offspring Inherit Traits That Affect Survival In The Environment)/ig, 'Offspring Inherit Traits That Make Them More Or Less Suitable To Survive In The Environment');
+  conceptDesc = conceptDesc.replace(/(Organisms Are Composed Of 1 Or More Cells That Are Made Of Molecules...& Perform Life Functions)/ig, 'Organisms Are Composed Of One Or More Cells That Are Made Of Molecules & Perform Life Functions');
+  conceptDesc = conceptDesc.replace(/(Organisms Are Composed Of One Or More Cells That Are Made)/ig, 'Organisms Are Composed Of One Or More Cells That Are Made Of Molecules & Perform Life Functions');
+  conceptDesc = conceptDesc.replace(/(Organs In An Organism Are Made Of Cells That Perform Life Functions)/ig, 'Organs In An Organism Are Made Of Cells That Have Structure & Perform Specific Life Functions');
+  conceptDesc = conceptDesc.replace(/^(Properties & Behavior Of Heat, Light & Sound)$/ig, 'Understand Properties & Behavior Of Heat, Light & Sound');
+  conceptDesc = conceptDesc.replace(/^(Awareness Of Social & Historical Aspects Of Science)$/ig, 'Demonstrate Awareness Of Social & Historical Aspects Of Science');
+
+  // Convert to case where all words start with capital letter
+  conceptDesc = conceptDesc.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+  return conceptDesc;
+}
+
+function crtTestScoresTransform(observer) {
+  return observer
+    .map(item => {
+      // If item.test_program_desc is spelled wrong, replace that value with the correctly spelled value
+      item.test_program_desc = item.test_program_desc === 'Earth Sytems Science' ? 'Earth Systems Science' : item.test_program_desc;
+      if (item.test_program_desc === 'Algebra 1') {
+        item.test_program_desc = 'Algebra I';
+      } else if (item.test_program_desc === 'Algebra 2') {
+        item.test_program_desc = 'Algebra II';
+      }
+      item.concept_desc = correctConceptDesc(item.concept_desc);
+      return item;
+    })
+    .bufferCount(600)
+    .flatMap(items => {
+      var distinctTestNames = [];
+      var distinctItems = uniqWith(items, isEqual);
+
+      items.forEach(item => {
+        if (distinctTestNames.indexOf(item.test_program_desc) === -1) {
+          distinctTestNames.push(item.test_program_desc);
+        }
+      });
+
+      return Observable.zip(
+        Observable.fromPromise(getTestIdsFromNamesBatch(distinctTestNames)),
+
+        testIds => {
+          return distinctItems.map(item => {
+            let matchingTestId = testIds.rows.filter(testId => testId.TEST_NAME === item.test_program_desc);
+            if (matchingTestId.length) {
+              item.testId = matchingTestId[0].TEST_ID;
+            }
+            return item;
+          });
+        }
+      );
+    })
+    .flatMap(items => Observable.from(items));
+}
 
 /**
  * converts a school year in the format "2011" to "2010-2011"
@@ -201,85 +345,4 @@ function consoleNode(observable) {
     console.dir(x);
   });
 }
-
-function crtCsvSink(config, observable) {
-  return observable
-    .groupBy(x => x.extra.testProgramDesc)
-    .subscribe(groupedObservable => {
-      let ws;
-      toCsvObservable(config, groupedObservable)
-        .subscribe(
-          item => {
-            if (!ws && item.ws) {
-              ws = item.ws;
-            }
-            ws.write(item.csv);
-          },
-
-          error => console.log('error == ', error),
-
-          () => {
-            console.log('close writestream');
-            ws.end();
-          }
-        );
-    });
-}
-
-
-/**
- * maps objects emitted by srcObservable to a new Observable that
- * converts those objects to csv strings and emits the results
- * @param  {GroupedObservable} observable source Observable
- * @return {object}
- *        {
- *          observable: // new observable that emits csv data derived from @param srcObservable
- *          ws: writable file stream to write results to file system
- *        }
- */
-function toCsvObservable(config, srcObservable) {
-  return srcObservable.concatMap(function (item, i) {
-    if (!item.csvOutput['Student Id']) {
-      console.log('found record that does not have student id:', item);
-    }
-    if (i === 0) {
-      let outputFilename = `output/crt/EOL - ${item.extra.testProgramDesc}-${config.prompt.table}.txt`;
-
-      // creates file if it doesn't exist
-      var ws = createWriteStream(outputFilename, {
-        flags: 'a'
-      });
-
-      try {
-        ws.on('open', function (fd) {
-          truncateSync(outputFilename);
-        });
-      } catch (e) {
-        console.log('couldnt truncate file');
-        console.log('e == %j', e);
-      }
-    }
-    return toCSV({
-      data: item.csvOutput,
-      del: '\t',
-      hasCSVColumnTitle: i === 0 // print columns only if this is the first item emitted
-    })
-      .then(csvStr => {
-        let csvRemQuotes = csvStr.replace(/"/g, '');
-
-        // Add a newline character before every line except the first line
-        let csvVal = i === 0 ? csvRemQuotes : EOL + csvRemQuotes;
-        if (ws) {
-          return {
-            csv: csvVal,
-            ws: ws
-          };
-        } else {
-          return {
-            csv: csvVal
-          };
-        }
-      });
-
-  });
 }
