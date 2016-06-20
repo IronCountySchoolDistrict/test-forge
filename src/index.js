@@ -73,7 +73,6 @@ async function main() {
     console.log('error setting up orawrap');
     console.log(e);
   }
-  console.log('in main');
 
   let jsonPackage = await getPackage();
   program
