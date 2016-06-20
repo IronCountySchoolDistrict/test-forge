@@ -10,7 +10,7 @@ export class PowerSchoolCoupler {
     if (channelName === 'Test Scores') {
       return observable
         .subscribe(testScore => {
-          createTestScore(testScore.testId, 'TODO: cut off name to 35 chars here', testScore.concept_desc);
+          createTestScore(testScore.testId, testScore.scoreName, testScore.concept_desc);
         });
     }
   }

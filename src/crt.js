@@ -5,7 +5,7 @@ import Promise from 'bluebird';
 import {Observable} from '@reactivex/rxjs';
 import {isEmpty} from 'lodash';
 import {gustav} from 'gustav';
-import {merge, uniq, uniqWith, isEqual} from 'lodash';
+import {merge, uniq, uniqWith, isEqual, truncate} from 'lodash';
 
 import {
   ssidToStudentNumber,
@@ -300,9 +300,7 @@ function crtTestScoresTransform(observer) {
     })
     .bufferCount(600)
     .flatMap(items => {
-      var distinctTestNames = [];
-      var distinctItems = uniqWith(items, isEqual);
-
+      const distinctItems = uniqWith(items, isEqual);
       const distinctTestNames = uniqWith(items, (a, b) => a.test_program_desc === b.test_program_desc)
         .map(item => item.test_program_desc)
         .map(testProgramDesc => `EOL - ${testProgramDesc}`);
@@ -317,6 +315,10 @@ function crtTestScoresTransform(observer) {
             if (matchingTestId.length) {
               item.testId = matchingTestId[0].ID;
             }
+            item.scoreName = truncate(item.concept_desc, {
+              length: 35,
+              separator: ' '
+            });
             return item;
           });
         }
