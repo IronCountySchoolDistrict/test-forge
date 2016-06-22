@@ -2,7 +2,8 @@ import {Observable} from '@reactivex/rxjs';
 import {
   getCrtTestScores,
   getCrtProficiency,
-  getCrtTestResults
+  getCrtTestResults,
+  getCrtTestResultConcepts
 } from '.././service';
 
 export class SamsCoupler {
@@ -16,6 +17,8 @@ export class SamsCoupler {
   from(channelName) {
     if (channelName === 'Test Results') {
       return getCrtTestResults();
+    } else if (channelName === 'Test Result Concepts') {
+      return getCrtTestResultConcepts();
     } else if (channelName === 'U_StudentTestProficiency') {
       return getCrtProficiency();
     } else if (channelName === 'Test Scores') {

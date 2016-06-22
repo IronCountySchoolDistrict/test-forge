@@ -81,8 +81,7 @@ export class CsvCoupler {
       .groupBy(x => property(channel.groupByProperty)(x))
       .subscribe(groupedObservable => {
         let ws;
-        this.toCsvObservable(channel, groupedObservable)
-          .subscribe(
+        this.toCsvObservable(channel, groupedObservable).subscribe(
           item => {
             if (!ws && item.ws) {
               ws = item.ws;
@@ -96,7 +95,7 @@ export class CsvCoupler {
             console.log('close writestream');
             ws.end();
           }
-          );
+        );
       });
   }
 }
