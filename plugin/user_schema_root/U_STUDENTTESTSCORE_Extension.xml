@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<psExtension xmlns="http://www.powerschool.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.powerschool.com psextension.xsd">
-    <extensionname>U_STUDENTTESTSCORE_Extension</extensionname>
-    <extendedTable coreTable="STUDENTTESTSCORE" dbTableName="U_StudentTestSubscore" childName="U_StudentTestSubscore" comment="">
-        <field name="score" type="String" length="40"/>
-        <field name="u_testsubscore_id" type="Integer"/>
-        <field name="scoretype" type="String" length="40"/>
-    </extendedTable>
-</psExtension>

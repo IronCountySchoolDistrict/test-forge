@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<psExtension xmlns="http://www.powerschool.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.powerschool.com psextension.xsd">
-    <extensionname>U_TEST_Extension</extensionname>
-    <extendedTable coreTable="TEST" dbTableName="U_TestSubscore" childName="U_TestSubscore" comment="">
-        <field name="name" type="String" length="40"/>
-        <field name="sortorder" type="String" length="40"/>
-    </extendedTable>
-</psExtension>
