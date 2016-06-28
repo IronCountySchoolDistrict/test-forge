@@ -14,13 +14,28 @@ import {
   studentTestScoreDuplicateCheck,
   ssidsToStudentIds
 }
-  from './blogic';
-import {getStudentIdsFromSsidBatch, getTestIdsFromNamesBatch} from './service';
-import {logger} from './index';
-import {printObj} from './util';
-import {SamsCoupler} from './couplers/sams';
-import {PowerSchoolCoupler} from './couplers/powerschool';
-import {CsvCoupler} from './couplers/csv';
+from './blogic';
+import {
+  getStudentIdsFromSsidBatch,
+  getTestIdsFromNamesBatch,
+  getStudentIdsFromSsidBatchDual
+} from './service';
+import { logger } from './index';
+import { printObj } from './util';
+import { SamsCoupler } from './couplers/sams';
+import { PowerSchoolCoupler } from './couplers/powerschool';
+import { CsvCoupler } from './couplers/csv';
+
+function logErrors(item, msg, e) {
+  logger.log('info', msg, {
+    psDbError: printObj(e)
+  });
+  if (item) {
+    logger.log('info', 'Source Data Record: ', {
+      sourceData: printObj(item)
+    });
+  }
+}
 
 export function createWorkflow(prompt) {
   gustav.addCoupler(new SamsCoupler());
