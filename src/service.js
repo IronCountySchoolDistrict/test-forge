@@ -1,18 +1,11 @@
 // Collection of database queries
 import Promise from 'bluebird';
 import orawrap from 'orawrap';
-import {
-  Observable
-} from '@reactivex/rxjs';
+import { Observable } from '@reactivex/rxjs';
 import cache from 'memory-cache';
 
-import {
-  execute,
-  msExecute
-} from './database';
-import {
-  logger
-} from './index';
+import { execute, msExecute } from './database';
+import { logger } from './index';
 
 export function getMatchingStudentTest(studentNumber, termName, testId) {
   return execute(`
