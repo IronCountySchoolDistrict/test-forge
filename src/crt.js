@@ -135,9 +135,7 @@ function testResultsTransform(observer) {
         }
       );
     })
-    .flatMap(item => {
-      return Observable.from(item);
-    })
+    .flatMap(item => Observable.from(item))
     .flatMap(item => {
       return Observable.zip(
         testNameToDcid(item.test_program_desc, item),
