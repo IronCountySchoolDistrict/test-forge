@@ -35,12 +35,13 @@ export function getMatchingStudentTest(studentNumber, termName, testId) {
  * if exactly one match is found. If zero matches, or more than match,
  * is found, reject with an error message.
  */
-export function getMatchingStudentTestScore(studentNumber, termName, score, testId) {
+export function getMatchingStudentTestScore(studentNumber, termName, score, testId, scoreName) {
   return execute(`
     SELECT studenttestscore.dcid
     FROM studenttestscore
       JOIN studenttest ON studenttest.id = STUDENTTESTSCORE.STUDENTTESTID
       JOIN students on studenttest.STUDENTID=students.id
+      JOIN testscore ON studenttestscore.testscoreid = testscore.id
     WHERE students.student_number = :student_number
           AND (studenttestscore.alphascore = :score OR
                studenttestscore.numscore = :score OR
@@ -54,14 +55,36 @@ export function getMatchingStudentTestScore(studentNumber, termName, score, test
                                 WHERE name = :term_name)
               )
           AND studenttest.testid = :test_id
+          AND testscore.name = :score_name
     `, {
-    student_number: studentNumber,
-    score: score,
-    term_name: termName,
-    test_id: testId
-  }, {
-    outFormat: orawrap.OBJECT
-  });
+      student_number: {
+        val: studentNumber,
+        dir: orawrap.BIND_IN,
+        type: orawrap.NUMBER
+      },
+      score: {
+        val: score,
+        dir: orawrap.BIND_IN,
+        type: orawrap.NUMBER
+      },
+      term_name: {
+        val: termName,
+        dir: orawrap.BIND_IN,
+        type: orawrap.STRING
+      },
+      test_id: {
+        val: testId,
+        dir: orawrap.BIND_IN,
+        type: orawrap.NUMBER
+      },
+      score_name: {
+        val: scoreName,
+        dir: orawrap.BIND_IN,
+        type: orawrap.STRING
+      }
+    }, {
+      outFormat: orawrap.OBJECT
+    });
 }
 
 export function getMatchingProficiency(studentNumber, termName, alphaScore, testId) {
@@ -131,8 +154,17 @@ export function getTestIdsFromNamesBatch(testNames) {
          ) test_input
       JOIN test ON test_input.test_name = test.name
     `, [testNames.join(',')], {
-    outFormat: orawrap.OBJECT
-  });
+      outFormat: orawrap.OBJECT
+    })
+    .then(results => {
+      return results.rows.map(result => {
+        let newObj = {};
+        Object.keys(result).forEach(key => {
+          newObj[key.toLowerCase()] = result[key];
+        });
+        return newObj;
+      });
+    });
 }
 
 export function getTestDcid(testId) {
