@@ -930,6 +930,487 @@ export function getCrtProficiency() {
   `);
 }
 
+export function getCrtTestResultConcepts() {
+  return msExecute(`
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM sams_2008.dbo.student_test
+      INNER JOIN sams_2008.dbo.student_enrollment
+        ON sams_2008.dbo.student_test.student_id =
+           sams_2008.dbo.student_enrollment.student_id AND
+           sams_2008.dbo.student_test.school_year =
+           sams_2008.dbo.student_enrollment.school_year AND
+           sams_2008.dbo.student_test.school_number =
+           sams_2008.dbo.student_enrollment.school_number AND
+           sams_2008.dbo.student_test.district_id =
+           sams_2008.dbo.student_enrollment.district_id
+      INNER JOIN sams_2008.dbo.student_master
+        ON sams_2008.dbo.student_test.student_id =
+           sams_2008.dbo.student_master.student_id
+      INNER JOIN sams_2008.dbo.test_program
+        ON sams_2008.dbo.student_test.test_prog_id =
+           sams_2008.dbo.test_program.test_prog_id
+           AND sams_2008.dbo.student_test.test_overall_score != 0
+           AND sams_2008.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN sams_2008.dbo.student_test_concept
+        ON sams_2008.dbo.student_test_concept.student_test_id =
+           sams_2008.dbo.student_test.student_test_id
+      INNER JOIN sams_2008.dbo.test_concept
+        ON sams_2008.dbo.student_test_concept.concept_id = sams_2008.dbo.test_concept.concept_id AND
+           sams_2008.dbo.test_concept.test_prog_id = sams_2008.dbo.student_test_concept.test_prog_id
+    UNION
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM sams_2009.dbo.student_test
+      INNER JOIN sams_2009.dbo.student_enrollment
+        ON sams_2009.dbo.student_test.student_id =
+           sams_2009.dbo.student_enrollment.student_id AND
+           sams_2009.dbo.student_test.school_year =
+           sams_2009.dbo.student_enrollment.school_year AND
+           sams_2009.dbo.student_test.school_number =
+           sams_2009.dbo.student_enrollment.school_number AND
+           sams_2009.dbo.student_test.district_id =
+           sams_2009.dbo.student_enrollment.district_id
+      INNER JOIN sams_2009.dbo.student_master
+        ON sams_2009.dbo.student_test.student_id =
+           sams_2009.dbo.student_master.student_id
+      INNER JOIN sams_2009.dbo.test_program
+        ON sams_2009.dbo.student_test.test_prog_id =
+           sams_2009.dbo.test_program.test_prog_id
+           AND sams_2009.dbo.student_test.test_overall_score != 0
+           AND sams_2009.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN sams_2009.dbo.student_test_concept
+        ON sams_2009.dbo.student_test_concept.student_test_id =
+           sams_2009.dbo.student_test.student_test_id
+      INNER JOIN sams_2009.dbo.test_concept
+        ON sams_2009.dbo.student_test_concept.concept_id = sams_2009.dbo.test_concept.concept_id AND
+           sams_2009.dbo.test_concept.test_prog_id = sams_2009.dbo.student_test_concept.test_prog_id
+    UNION
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM sams_2010.dbo.student_test
+      INNER JOIN sams_2010.dbo.student_enrollment
+        ON sams_2010.dbo.student_test.student_id =
+           sams_2010.dbo.student_enrollment.student_id AND
+           sams_2010.dbo.student_test.school_year =
+           sams_2010.dbo.student_enrollment.school_year AND
+           sams_2010.dbo.student_test.school_number =
+           sams_2010.dbo.student_enrollment.school_number AND
+           sams_2010.dbo.student_test.district_id =
+           sams_2010.dbo.student_enrollment.district_id
+      INNER JOIN sams_2010.dbo.student_master
+        ON sams_2010.dbo.student_test.student_id =
+           sams_2010.dbo.student_master.student_id
+      INNER JOIN sams_2010.dbo.test_program
+        ON sams_2010.dbo.student_test.test_prog_id =
+           sams_2010.dbo.test_program.test_prog_id
+           AND sams_2010.dbo.student_test.test_overall_score != 0
+           AND sams_2010.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN sams_2010.dbo.student_test_concept
+        ON sams_2010.dbo.student_test_concept.student_test_id =
+           sams_2010.dbo.student_test.student_test_id
+      INNER JOIN sams_2010.dbo.test_concept
+        ON sams_2010.dbo.student_test_concept.concept_id =
+           sams_2010.dbo.test_concept.concept_id AND
+           sams_2010.dbo.test_concept.test_prog_id =
+           sams_2010.dbo.student_test_concept.test_prog_id
+    UNION
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM sams_2011.dbo.student_test
+      INNER JOIN sams_2011.dbo.student_enrollment
+        ON sams_2011.dbo.student_test.student_id =
+           sams_2011.dbo.student_enrollment.student_id AND
+           sams_2011.dbo.student_test.school_year =
+           sams_2011.dbo.student_enrollment.school_year AND
+           sams_2011.dbo.student_test.school_number =
+           sams_2011.dbo.student_enrollment.school_number AND
+           sams_2011.dbo.student_test.district_id =
+           sams_2011.dbo.student_enrollment.district_id
+      INNER JOIN sams_2011.dbo.student_master
+        ON sams_2011.dbo.student_test.student_id =
+           sams_2011.dbo.student_master.student_id
+      INNER JOIN sams_2011.dbo.test_program
+        ON sams_2011.dbo.student_test.test_prog_id =
+           sams_2011.dbo.test_program.test_prog_id
+           AND sams_2011.dbo.student_test.test_overall_score != 0
+           AND sams_2011.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN sams_2011.dbo.student_test_concept
+        ON sams_2011.dbo.student_test_concept.student_test_id =
+           sams_2011.dbo.student_test.student_test_id
+      INNER JOIN sams_2011.dbo.test_concept
+        ON sams_2011.dbo.student_test_concept.concept_id =
+           sams_2011.dbo.test_concept.concept_id AND
+           sams_2011.dbo.test_concept.test_prog_id =
+           sams_2011.dbo.student_test_concept.test_prog_id
+    UNION
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM sams_2012.dbo.student_test
+      INNER JOIN sams_2012.dbo.student_enrollment
+        ON sams_2012.dbo.student_test.student_id =
+           sams_2012.dbo.student_enrollment.student_id AND
+           sams_2012.dbo.student_test.school_year =
+           sams_2012.dbo.student_enrollment.school_year AND
+           sams_2012.dbo.student_test.school_number =
+           sams_2012.dbo.student_enrollment.school_number AND
+           sams_2012.dbo.student_test.district_id =
+           sams_2012.dbo.student_enrollment.district_id
+      INNER JOIN sams_2012.dbo.student_master
+        ON sams_2012.dbo.student_test.student_id =
+           sams_2012.dbo.student_master.student_id
+      INNER JOIN sams_2012.dbo.test_program
+        ON sams_2012.dbo.student_test.test_prog_id =
+           sams_2012.dbo.test_program.test_prog_id
+           AND sams_2012.dbo.student_test.test_overall_score != 0
+           AND sams_2012.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN sams_2012.dbo.student_test_concept
+        ON sams_2012.dbo.student_test_concept.student_test_id =
+           sams_2012.dbo.student_test.student_test_id
+      INNER JOIN sams_2012.dbo.test_concept
+        ON sams_2012.dbo.student_test_concept.concept_id =
+           sams_2012.dbo.test_concept.concept_id AND
+           sams_2012.dbo.test_concept.test_prog_id =
+           sams_2012.dbo.student_test_concept.test_prog_id
+    UNION
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM sams_2013.dbo.student_test
+      INNER JOIN sams_2013.dbo.student_enrollment
+        ON sams_2013.dbo.student_test.student_id =
+           sams_2013.dbo.student_enrollment.student_id AND
+           sams_2013.dbo.student_test.school_year =
+           sams_2013.dbo.student_enrollment.school_year AND
+           sams_2013.dbo.student_test.school_number =
+           sams_2013.dbo.student_enrollment.school_number AND
+           sams_2013.dbo.student_test.district_id =
+           sams_2013.dbo.student_enrollment.district_id
+      INNER JOIN sams_2013.dbo.student_master
+        ON sams_2013.dbo.student_test.student_id =
+           sams_2013.dbo.student_master.student_id
+      INNER JOIN sams_2013.dbo.test_program
+        ON sams_2013.dbo.student_test.test_prog_id =
+           sams_2013.dbo.test_program.test_prog_id
+           AND sams_2013.dbo.student_test.test_overall_score != 0
+           AND sams_2013.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN sams_2013.dbo.student_test_concept
+        ON sams_2013.dbo.student_test_concept.student_test_id =
+           sams_2013.dbo.student_test.student_test_id
+      INNER JOIN sams_2013.dbo.test_concept
+        ON sams_2013.dbo.student_test_concept.concept_id =
+           sams_2013.dbo.test_concept.concept_id AND
+           sams_2013.dbo.test_concept.test_prog_id =
+           sams_2013.dbo.student_test_concept.test_prog_id
+    UNION
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM sams_merge.dbo.student_test
+      INNER JOIN sams_merge.dbo.student_enrollment
+        ON sams_merge.dbo.student_test.student_id =
+           sams_merge.dbo.student_enrollment.student_id AND
+           sams_merge.dbo.student_test.school_year =
+           sams_merge.dbo.student_enrollment.school_year AND
+           sams_merge.dbo.student_test.school_number =
+           sams_merge.dbo.student_enrollment.school_number AND
+           sams_merge.dbo.student_test.district_id =
+           sams_merge.dbo.student_enrollment.district_id
+      INNER JOIN sams_merge.dbo.student_master
+        ON sams_merge.dbo.student_test.student_id =
+           sams_merge.dbo.student_master.student_id
+      INNER JOIN sams_merge.dbo.test_program
+        ON sams_merge.dbo.student_test.test_prog_id =
+           sams_merge.dbo.test_program.test_prog_id
+           AND sams_merge.dbo.student_test.test_overall_score != 0
+           AND sams_merge.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN sams_merge.dbo.student_test_concept
+        ON sams_merge.dbo.student_test_concept.student_test_id =
+           sams_merge.dbo.student_test.student_test_id
+      INNER JOIN sams_merge.dbo.test_concept
+        ON sams_merge.dbo.student_test_concept.concept_id =
+           sams_merge.dbo.test_concept.concept_id AND
+           sams_merge.dbo.test_concept.test_prog_id =
+           sams_merge.dbo.student_test_concept.test_prog_id
+    UNION
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM success_2008.dbo.student_test
+      INNER JOIN success_2008.dbo.student_enrollment
+        ON success_2008.dbo.student_test.student_id =
+           success_2008.dbo.student_enrollment.student_id AND
+           success_2008.dbo.student_test.school_year =
+           success_2008.dbo.student_enrollment.school_year AND
+           success_2008.dbo.student_test.school_number =
+           success_2008.dbo.student_enrollment.school_number AND
+           success_2008.dbo.student_test.district_id =
+           success_2008.dbo.student_enrollment.district_id
+      INNER JOIN success_2008.dbo.student_master
+        ON success_2008.dbo.student_test.student_id =
+           success_2008.dbo.student_master.student_id
+      INNER JOIN success_2008.dbo.test_program
+        ON success_2008.dbo.student_test.test_prog_id =
+           success_2008.dbo.test_program.test_prog_id
+           AND success_2008.dbo.student_test.test_overall_score != 0
+           AND success_2008.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN success_2008.dbo.student_test_concept
+        ON success_2008.dbo.student_test_concept.student_test_id =
+           success_2008.dbo.student_test.student_test_id
+      INNER JOIN success_2008.dbo.test_concept
+        ON success_2008.dbo.student_test_concept.concept_id =
+           success_2008.dbo.test_concept.concept_id AND
+           success_2008.dbo.test_concept.test_prog_id =
+           success_2008.dbo.student_test_concept.test_prog_id
+    UNION
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM success_2009.dbo.student_test
+      INNER JOIN success_2009.dbo.student_enrollment
+        ON success_2009.dbo.student_test.student_id =
+           success_2009.dbo.student_enrollment.student_id AND
+           success_2009.dbo.student_test.school_year =
+           success_2009.dbo.student_enrollment.school_year AND
+           success_2009.dbo.student_test.school_number =
+           success_2009.dbo.student_enrollment.school_number AND
+           success_2009.dbo.student_test.district_id =
+           success_2009.dbo.student_enrollment.district_id
+      INNER JOIN success_2009.dbo.student_master
+        ON success_2009.dbo.student_test.student_id =
+           success_2009.dbo.student_master.student_id
+      INNER JOIN success_2009.dbo.test_program
+        ON success_2009.dbo.student_test.test_prog_id =
+           success_2009.dbo.test_program.test_prog_id
+           AND success_2009.dbo.student_test.test_overall_score != 0
+           AND success_2009.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN success_2009.dbo.student_test_concept
+        ON success_2009.dbo.student_test_concept.student_test_id =
+           success_2009.dbo.student_test.student_test_id
+      INNER JOIN success_2009.dbo.test_concept
+        ON success_2009.dbo.student_test_concept.concept_id =
+           success_2009.dbo.test_concept.concept_id AND
+           success_2009.dbo.test_concept.test_prog_id =
+           success_2009.dbo.student_test_concept.test_prog_id
+    UNION
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM success_2010.dbo.student_test
+      INNER JOIN success_2010.dbo.student_enrollment
+        ON success_2010.dbo.student_test.student_id =
+           success_2010.dbo.student_enrollment.student_id AND
+           success_2010.dbo.student_test.school_year =
+           success_2010.dbo.student_enrollment.school_year AND
+           success_2010.dbo.student_test.school_number =
+           success_2010.dbo.student_enrollment.school_number AND
+           success_2010.dbo.student_test.district_id =
+           success_2010.dbo.student_enrollment.district_id
+      INNER JOIN success_2010.dbo.student_master
+        ON success_2010.dbo.student_test.student_id =
+           success_2010.dbo.student_master.student_id
+      INNER JOIN success_2010.dbo.test_program
+        ON success_2010.dbo.student_test.test_prog_id =
+           success_2010.dbo.test_program.test_prog_id
+           AND success_2010.dbo.student_test.test_overall_score != 0
+           AND success_2010.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN success_2010.dbo.student_test_concept
+        ON success_2010.dbo.student_test_concept.student_test_id =
+           success_2010.dbo.student_test.student_test_id
+      INNER JOIN success_2010.dbo.test_concept
+        ON success_2010.dbo.student_test_concept.concept_id =
+           success_2010.dbo.test_concept.concept_id AND
+           success_2010.dbo.test_concept.test_prog_id =
+           success_2010.dbo.student_test_concept.test_prog_id
+    UNION
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM success_2011.dbo.student_test
+      INNER JOIN success_2011.dbo.student_enrollment
+        ON success_2011.dbo.student_test.student_id =
+           success_2011.dbo.student_enrollment.student_id AND
+           success_2011.dbo.student_test.school_year =
+           success_2011.dbo.student_enrollment.school_year AND
+           success_2011.dbo.student_test.school_number =
+           success_2011.dbo.student_enrollment.school_number AND
+           success_2011.dbo.student_test.district_id =
+           success_2011.dbo.student_enrollment.district_id
+      INNER JOIN success_2011.dbo.student_master
+        ON success_2011.dbo.student_test.student_id =
+           success_2011.dbo.student_master.student_id
+      INNER JOIN success_2011.dbo.test_program
+        ON success_2011.dbo.student_test.test_prog_id =
+           success_2011.dbo.test_program.test_prog_id
+           AND success_2011.dbo.student_test.test_overall_score != 0
+           AND success_2011.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN success_2011.dbo.student_test_concept
+        ON success_2011.dbo.student_test_concept.student_test_id =
+           success_2011.dbo.student_test.student_test_id
+      INNER JOIN success_2011.dbo.test_concept
+        ON success_2011.dbo.student_test_concept.concept_id =
+           success_2011.dbo.test_concept.concept_id AND
+           success_2011.dbo.test_concept.test_prog_id =
+           success_2011.dbo.student_test_concept.test_prog_id
+    UNION
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM success_2012.dbo.student_test
+      INNER JOIN success_2012.dbo.student_enrollment
+        ON success_2012.dbo.student_test.student_id =
+           success_2012.dbo.student_enrollment.student_id AND
+           success_2012.dbo.student_test.school_year =
+           success_2012.dbo.student_enrollment.school_year AND
+           success_2012.dbo.student_test.school_number =
+           success_2012.dbo.student_enrollment.school_number AND
+           success_2012.dbo.student_test.district_id =
+           success_2012.dbo.student_enrollment.district_id
+      INNER JOIN success_2012.dbo.student_master
+        ON success_2012.dbo.student_test.student_id =
+           success_2012.dbo.student_master.student_id
+      INNER JOIN success_2012.dbo.test_program
+        ON success_2012.dbo.student_test.test_prog_id =
+           success_2012.dbo.test_program.test_prog_id
+           AND success_2012.dbo.student_test.test_overall_score != 0
+           AND success_2012.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN success_2012.dbo.student_test_concept
+        ON success_2012.dbo.student_test_concept.student_test_id =
+           success_2012.dbo.student_test.student_test_id
+      INNER JOIN success_2012.dbo.test_concept
+        ON success_2012.dbo.student_test_concept.concept_id =
+           success_2012.dbo.test_concept.concept_id AND
+           success_2012.dbo.test_concept.test_prog_id =
+           success_2012.dbo.student_test_concept.test_prog_id
+    UNION
+    SELECT DISTINCT
+      student_test.school_year,
+      student_test.test_overall_score,
+      student_master.ssid,
+      student_enrollment.grade_level,
+      test_program.test_program_desc,
+      test_concept.concept_desc,
+      student_test_concept.pct_of_questions_correct,
+      student_test.student_test_id,
+      test_concept.test_prog_id
+    FROM success_2013.dbo.student_test
+      INNER JOIN success_2013.dbo.student_enrollment
+        ON success_2013.dbo.student_test.student_id =
+           success_2013.dbo.student_enrollment.student_id AND
+           success_2013.dbo.student_test.school_year =
+           success_2013.dbo.student_enrollment.school_year AND
+           success_2013.dbo.student_test.school_number =
+           success_2013.dbo.student_enrollment.school_number AND
+           success_2013.dbo.student_test.district_id =
+           success_2013.dbo.student_enrollment.district_id
+      INNER JOIN success_2013.dbo.student_master
+        ON success_2013.dbo.student_test.student_id =
+           success_2013.dbo.student_master.student_id
+      INNER JOIN success_2013.dbo.test_program
+        ON success_2013.dbo.student_test.test_prog_id =
+           success_2013.dbo.test_program.test_prog_id
+           AND success_2013.dbo.student_test.test_overall_score != 0
+           AND success_2013.dbo.student_test.test_overall_score IS NOT NULL
+      INNER JOIN success_2013.dbo.student_test_concept
+        ON success_2013.dbo.student_test_concept.student_test_id =
+           success_2013.dbo.student_test.student_test_id
+      INNER JOIN success_2013.dbo.test_concept
+        ON success_2013.dbo.student_test_concept.concept_id =
+           success_2013.dbo.test_concept.concept_id AND
+           success_2013.dbo.test_concept.test_prog_id =
+           success_2013.dbo.student_test_concept.test_prog_id
+  `);
+}
+
 export function getCrtTestScores() {
   return msExecute(`
     SELECT
