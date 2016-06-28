@@ -35,13 +35,13 @@ export function ssidsToStudentIds(ssids) {
       const mergedStudentIds = ssids
         .map(ssid => {
           const matchingStudentIdItem = studentIds.rows.filter(studentId => {
-            return parseInt(studentId.SSID) === ssid
+            return parseInt(studentId.ssid) === ssid
           });
           if (matchingStudentIdItem.length) {
             return {
               ssid: ssid,
-              studentId: matchingStudentIdItem[0].STUDENT_ID,
-              studentNumber: matchingStudentIdItem[0].STUDENT_NUMBER
+              studentId: matchingStudentIdItem[0].student_id,
+              studentNumber: matchingStudentIdItem[0].student_number
             };
           } else {
             let errorObj = {
@@ -55,7 +55,7 @@ export function ssidsToStudentIds(ssids) {
         .filter(item => !!item);
       //mergedArray still contains null elements that should be filtered
       return Observable.of(mergedStudentIds);
-    })
+    });
 }
 
 export function ssidToStudentNumber(ssid, item) {
