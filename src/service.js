@@ -145,8 +145,8 @@ export function getMatchingTests(searchTerm) {
 export function getTestIdsFromNamesBatch(testNames) {
   return execute(`
     SELECT
-      test_input.test_name,
-      test.id
+      test_input.test_name AS test_name,
+      test.id AS test_id
     FROM (
            SELECT REGEXP_SUBSTR(:test_names, '[^,]+', 1, level) AS test_name
            FROM dual
@@ -189,29 +189,38 @@ export function getStudentIdsFromSsidBatch(ssids) {
 export function getStudentIdsFromSsidBatchDual(ssids) {
   try {
     return execute(`
-    SELECT
-      ssid_input.ssid AS ssid,
-      students.id AS student_id,
-      students.student_number AS student_number
-    FROM (
-           SELECT REGEXP_SUBSTR(
-                      :ssids,
-                      '[^,]+', 1, level) AS ssid
-           FROM dual
-           CONNECT BY REGEXP_SUBSTR(
-                          :ssids,
-                          '[^,]+', 1, level) IS NOT NULL
-    ) ssid_input
-    LEFT JOIN students ON students.state_studentnumber = ssid_input.ssid`, {
-      ssids: {
-        val: ssids.join(','),
-        dir: orawrap.BIND_IN,
-        type: orawrap.STRING
-      }
-    }, {
-      outFormat: orawrap.OBJECT,
-      maxRows: ssids.length
-    });
+      SELECT
+        ssid_input.ssid AS ssid,
+        students.id AS student_id,
+        students.student_number AS student_number
+      FROM (
+             SELECT REGEXP_SUBSTR(
+                        :ssids,
+                        '[^,]+', 1, level) AS ssid
+             FROM dual
+             CONNECT BY REGEXP_SUBSTR(
+                            :ssids,
+                            '[^,]+', 1, level) IS NOT NULL
+      ) ssid_input
+      LEFT JOIN students ON students.state_studentnumber = ssid_input.ssid`, {
+        ssids: {
+          val: ssids.join(','),
+          dir: orawrap.BIND_IN,
+          type: orawrap.STRING
+        }
+      }, {
+        outFormat: orawrap.OBJECT,
+        maxRows: ssids.length
+      })
+      .then(results => {
+        return results.rows.map(result => {
+          let newObj = {};
+          Object.keys(result).forEach(key => {
+            newObj[key.toLowerCase()] = result[key];
+          })
+          return newObj;
+        });
+      });
   } catch (e) {
     console.error(e);
   }
