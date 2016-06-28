@@ -167,14 +167,15 @@ export function testNameToDcid(testName, item) {
  * checks for existing StudentTestScore records that match the `item` record passed in
  * @return {observable}
  */
-export function studentTestScoreDuplicateCheck(studentNumber, fullSchoolYear, testScore, testId, item) {
+export function studentTestScoreDuplicateCheck(studentNumber, fullSchoolYear, testScore, testId, scoreName, item) {
   return Observable.fromPromise(
-    getMatchingStudentTestScore(
-      studentNumber,
-      fullSchoolYear,
-      testScore,
-      testId
-    )
+      getMatchingStudentTestScore(
+        studentNumber,
+        fullSchoolYear,
+        testScore,
+        testId,
+        scoreName
+      )
     )
     .map(studentTestScore => {
       // Expecting there to NOT be any matching student test score record,
@@ -196,15 +197,48 @@ export function studentTestScoreDuplicateCheck(studentNumber, fullSchoolYear, te
     .filter(studentTestScore => !studentTestScore);
 }
 
+/**
+ * checks for existing StudentTestScore records that match the `item` record passed in
+ * @return {observable}
+ */
+export function studentTestResultConceptSDuplicateCheck(studentNumber, fullSchoolYear, testScore, testId, scoreName, item) {
+  return Observable.fromPromise(
+      getMatchingStudentTestScore(
+        studentNumber,
+        fullSchoolYear,
+        testScore,
+        testId,
+        scoreName
+      )
+    )
+    .map(studentTestScore => {
+      // Expecting there to NOT be any matching student test score record,
+      // so if there is one or more, throw an exception
+      if (studentTestScore.rows.length) {
+        throw {
+          studentTestScore: studentTestScore,
+          testResult: item.testResult,
+          message: `expected checkDuplicateStudentTestScore to return 0 records, got ${studentTestScore.rows.length} rows`
+        };
+      } else {
+        return null; // Returning a truthy value will allow the current record to be processed
+      }
+    })
+    .catch(e => {
+      logErrors(item, `Error checking for matching student test records for studentNumber: ${studentNumber}`, e);
+      return Observable.of(true);
+    })
+    .filter(studentTestScore => !studentTestScore);
+}
 
 export function proficiencyDuplicateCheck(studentNumber, fullSchoolYear, testScore, testId, item) {
   return Observable.fromPromise(
-    getMatchingProficiency(
-      studentNumber,
-      fullSchoolYear,
-      testScore,
-      testId
-    )
+      getMatchingProficiency(
+        studentNumber,
+        fullSchoolYear,
+        testScore,
+        testId
+      )
     )
     .map(proficiency => {
       if (proficiency.rows.length) {
@@ -229,12 +263,12 @@ export function proficiencyDuplicateCheck(studentNumber, fullSchoolYear, testSco
 
 export function testRecordToMatchingDcid(studentNumber, fullSchoolYear, testScore, testId, item) {
   return Observable.fromPromise(
-    getMatchingStudentTestScore(
-      studentNumber,
-      fullSchoolYear,
-      testScore,
-      testId
-    )
+      getMatchingStudentTestScore(
+        studentNumber,
+        fullSchoolYear,
+        testScore,
+        testId
+      )
     )
     .map(studentTestScore => {
       // Expecting there to NOT be any matching student test score record,
