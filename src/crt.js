@@ -94,14 +94,8 @@ function testResultsTransform(observer) {
   return observer
     .map(item => {
       // If item.test_program_desc is spelled wrong, replace that value with the correctly spelled value
-      item.test_program_desc = item.test_program_desc === 'Earth Sytems Science' ? 'Earth Systems Science' : item.test_program_desc;
-      item.test_date = new Date(`05/01/${item.school_year}`)
-        .toLocaleDateString();
-      if (item.test_program_desc === 'Algebra 1') {
-        item.test_program_desc = 'Algebra I';
-      } else if (item.test_program_desc === 'Algebra 2') {
-        item.test_program_desc = 'Algebra II';
-      }
+      item.test_program_desc = correctTestProgramDesc(item.test_program_desc);
+      item.test_date = new Date(`05/01/${item.school_year}`);
       return item;
     })
     .bufferCount(500)
@@ -156,6 +150,7 @@ function testResultsTransform(observer) {
         fullSchoolYear,
         item.testResult.test_overall_score,
         item.matchingTestId,
+        'Composite',
         item
       );
 
@@ -405,49 +400,61 @@ function correctConceptDesc(conceptDesc) {
 
   // Convert to case where all words start with capital letter
   conceptDesc = conceptDesc.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+
   return conceptDesc;
 }
 
-function crtTestScoresTransform(observer) {
-  return observer
-    .map(item => {
-      // If item.test_program_desc is spelled wrong, replace that value with the correctly spelled value
-      item.test_program_desc = item.test_program_desc === 'Earth Sytems Science' ? 'Earth Systems Science' : item.test_program_desc;
-      if (item.test_program_desc === 'Algebra 1') {
-        item.test_program_desc = 'Algebra I';
-      } else if (item.test_program_desc === 'Algebra 2') {
-        item.test_program_desc = 'Algebra II';
-      }
-      item.concept_desc = correctConceptDesc(item.concept_desc);
-      return item;
-    })
-    .bufferCount(600)
-    .flatMap(items => {
-      const distinctItems = uniqWith(items, isEqual);
-      const distinctTestNames = uniqWith(items, (a, b) => a.test_program_desc === b.test_program_desc)
-        .map(item => item.test_program_desc)
-        .map(testProgramDesc => `EOL - ${testProgramDesc}`);
+function groupBy(keyExtract, arr) {
+  return arr.reduce((result, item) => {
+    const key = keyExtract(item);
+    if (result.has(key)) {
+      result.set(key, [...result.get(key), item]);
+    } else {
+      result.set(key, [item]);
+    }
 
+    return result;
+  }, new Map());
+}
 
-      return Observable.zip(
-        Observable.fromPromise(getTestIdsFromNamesBatch(distinctTestNames)),
-
-        testIds => {
-          return distinctItems.map(item => {
-            let matchingTestId = testIds.rows.filter(testId => testId.TEST_NAME === `EOL - ${item.test_program_desc}`);
-            if (matchingTestId.length) {
-              item.testId = matchingTestId[0].ID;
-            }
-            item.scoreName = truncate(item.concept_desc, {
-              length: 35,
-              separator: ' '
-            });
-            return item;
-          });
+function mergeGroups(groups, array, mergeKeyExtract) {
+  try {
+    array.forEach(it => {
+      try {
+        const mergeKey = mergeKeyExtract(it);
+        const group = groups.get(mergeKey);
+        if (!group) {
+          throw `${mergeKey} not found`;
         }
-      );
-    })
-    .flatMap(items => Observable.from(items));
+        group.map(item => {
+          return Object.assign(item, it);
+        });
+
+      } catch (e) {
+        console.log(it, e);
+      }
+    });
+  } catch(e) {
+    console.log('merge error');
+    console.log(e);
+    console.log(array);
+  }
+
+}
+
+function flatten(groups, arrayMap) {
+	let arr = []
+	for (const [index, group] of groups.entries()) {
+  	arr.push(...group);
+  }
+  return arr;
+}
+
+function correctTestProgramDesc(test_program_desc) {
+  test_program_desc = test_program_desc === 'Earth Sytems Science' ? 'Earth Systems Science' : test_program_desc;
+  test_program_desc = test_program_desc === 'Algebra 1' ? 'Algebra I' : test_program_desc;
+  test_program_desc = test_program_desc === 'Algebra 2' ? 'Algebra II' : test_program_desc;
+  return test_program_desc;
 }
 
 /**
