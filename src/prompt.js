@@ -1,12 +1,8 @@
 require('babel-polyfill');
 
-import {
-  prompt
-} from 'inquirer';
+import { prompt } from 'inquirer';
 import json2csv from 'json2csv';
-import {
-  Observable
-} from '@reactivex/rxjs';
+import { Observable } from '@reactivex/rxjs';
 import Bluebird from 'bluebird';
 
 import detect from './detector';
@@ -48,16 +44,13 @@ async function promptTable() {
     type: 'list',
     name: 'table',
     message: 'Which table/data set are you forging import data for?',
-    choices: [
-      {
-        name: 'Test Results',
-        value: 'Test Results'
-      },
-      {
-        name: 'U_StudentTestProficiency',
-        value: 'U_StudentTestProficiency'
-      }
-    ]
+    choices: [{
+      name: 'Test Results',
+      value: 'Test Results'
+    }, {
+      name: 'U_StudentTestProficiency',
+      value: 'U_StudentTestProficiency'
+    }]
   };
 
   let importTable = await prompt([importQuestion]);
@@ -103,12 +96,15 @@ export async function promptHandlerSams(test) {
         name: 'Test Results',
         value: 'Test Results'
       }, {
-          name: 'U_StudentTestProficiency',
-          value: 'U_StudentTestProficiency'
-        }, {
-          name: 'Test Scores',
-          value: 'Test Scores'
-        }]
+        name: 'Test Result Concepts',
+        value: 'Test Result Concepts'
+      }, {
+        name: 'U_StudentTestProficiency',
+        value: 'U_StudentTestProficiency'
+      }, {
+        name: 'Test Scores',
+        value: 'Test Scores'
+      }]
     };
 
     let { table } = await prompt([importQuestion]);
