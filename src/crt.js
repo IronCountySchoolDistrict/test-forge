@@ -54,6 +54,9 @@ export function createWorkflow(prompt) {
     if (prompt.table === 'Test Results') {
       params.channel.groupByProperty = 'extra.testProgramDesc';
       params.channel.outputProperty = 'csvOutput';
+    } else if (prompt.table === 'Test Result Concepts') {
+      params.channel.groupByProperty = '';
+      params.channel.outputProperty = '';
     } else if (prompt.table === 'U_StudentTestProficiency') {
       params.channel.groupByProperty = 'extra.testProgramDesc';
       params.channel.outputProperty = 'csvOutput';
@@ -74,6 +77,9 @@ export function createWorkflow(prompt) {
 function transformer(config, observer) {
   if (config.table === 'Test Results') {
     return testResultsTransform(observer);
+  }
+  if (config.table === 'Test Result Concepts') {
+    return testResultConceptsTransform(observer);
   }
   if (config.table === 'U_StudentTestProficiency') {
     return proficiencyTransform(observer);
@@ -218,6 +224,110 @@ function proficiencyTransform(observer) {
           }
         }));
     });
+}
+
+function crtTestScoresTransform(observer) {
+  return observer
+    .map(item => {
+      // Correct spelling and formatting inconsistencies
+      item.test_program_desc = correctTestProgramDesc(item.test_program_desc);
+      item.concept_desc = correctConceptDesc(item.concept_desc);
+      return item;
+    })
+    .bufferCount(600)
+    .flatMap(items => {
+      const distinctItems = uniqWith(items, isEqual);
+      const distinctTestNames = uniqWith(items, (a, b) => a.test_program_desc === b.test_program_desc)
+        .map(item => item.test_program_desc)
+        .map(testProgramDesc => `EOL - ${testProgramDesc}`);
+
+
+      return Observable.zip(
+        Observable.fromPromise(getTestIdsFromNamesBatch(distinctTestNames)),
+
+        testIds => {
+          return distinctItems.map(item => {
+            let matchingTestId = testIds.rows.filter(testId => testId.TEST_NAME === `EOL - ${item.test_program_desc}`);
+            if (matchingTestId.length) {
+              item.testId = matchingTestId[0].ID;
+            }
+            item.scoreName = truncate(item.concept_desc, {
+              length: 35,
+              separator: ' '
+            });
+            return item;
+          });
+        }
+      );
+    })
+    .flatMap(items => Observable.from(items));
+}
+
+function testResultConceptsTransform(observer) {
+  return observer
+    .map(studentTestConceptResult => {
+      studentTestConceptResult.test_program_desc = correctTestProgramDesc(studentTestConceptResult.test_program_desc);
+      studentTestConceptResult.concept_desc = correctConceptDesc(studentTestConceptResult.concept_desc);
+      studentTestConceptResult.test_date = new Date(`05/01/${studentTestConceptResult.school_year}`);
+      return studentTestConceptResult;
+    })
+    .bufferCount(600)
+    .flatMap(bufferedStudentTestConceptResults => {
+      const distinctSsids = uniqWith(bufferedStudentTestConceptResults, (a, b) => a.ssid === b.ssid)
+        .map(item => item.ssid);
+      const distinctTestNames = uniqWith(bufferedStudentTestConceptResults, (a, b) => a.test_program_desc === b.test_program_desc)
+        .map(item => item.test_program_desc)
+        .map(testProgramDesc => `EOL - ${testProgramDesc}`);
+
+      return Observable.zip(
+        getStudentIdsFromSsidBatchDual(distinctSsids),
+        getTestIdsFromNamesBatch(distinctTestNames),
+
+        (studentIds, testIds) => {
+          const studentIdGroups = groupBy(item => parseInt(item.ssid), bufferedStudentTestConceptResults);
+          const testNameGroups = groupBy(item => `EOL - ${item.test_program_desc}`, bufferedStudentTestConceptResults);
+
+          mergeGroups(studentIdGroups, studentIds, item => parseInt(item.ssid));
+          mergeGroups(testNameGroups, testIds, item => item.test_name);
+
+          return flatten(testNameGroups);
+        }
+      );
+    })
+    .flatMap(item => Observable.from(item))
+    .flatMap(testConceptResult => {
+      const fullSchoolYear = toFullSchoolYear(testConceptResult.school_year);
+
+      // create a batch service method that checks for student test score (concept)
+      // there's going to be a lot of duplicates found here because i haven't found
+      // a good way to filter out duplicates out when working with buffered items
+      let matchingTestScore = studentTestScoreDuplicateCheck(
+        testConceptResult.student_number,
+        fullSchoolYear,
+        testConceptResult.pct_of_questions_correct,
+        testConceptResult.test_id,
+        testConceptResult.concept_desc,
+        testConceptResult
+      );
+
+      return matchingTestScore.map(_ => {
+        console.log(testConceptResult);
+        return {
+          csvOutput: {
+            'Test Date': testConceptResult.test_date,
+            'Student Id': testConceptResult.student_id,
+            'Student Number': testConceptResult.student_number,
+            'Grade Level': testConceptResult.grade_level,
+            'Concept Score Percent': testConceptResult.pct_of_questions_correct
+          },
+          'extra': {
+            testProgramDesc: testConceptResult.test_program_desc,
+            studentTestId: testConceptResult.student_test_id
+          }
+        }
+      })
+    })
+
 }
 
 function correctConceptDesc(conceptDesc) {
