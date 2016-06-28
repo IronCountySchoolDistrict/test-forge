@@ -1,11 +1,11 @@
 require('babel-polyfill');
 
-import {createWriteStream, truncateSync} from 'fs';
+import { createWriteStream, truncateSync } from 'fs';
 import Promise from 'bluebird';
-import {Observable} from '@reactivex/rxjs';
-import {isEmpty} from 'lodash';
-import {gustav} from 'gustav';
-import {merge, uniq, uniqWith, isEqual, truncate} from 'lodash';
+import { Observable } from '@reactivex/rxjs';
+import { isEmpty } from 'lodash';
+import { gustav } from 'gustav';
+import { merge, uniq, uniqWith, isEqual, truncate, extend, find } from 'lodash';
 
 import {
   ssidToStudentNumber,

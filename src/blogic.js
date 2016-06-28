@@ -9,10 +9,10 @@ import {
   getStudentIdsFromSsidBatchDual
 } from './service';
 import cache from 'memory-cache';
-import {printObj} from './util';
-import {logger} from './index';
-import {Observable} from '@reactivex/rxjs';
-import {merge} from 'lodash';
+import { printObj } from './util';
+import { logger } from './index';
+import { Observable } from '@reactivex/rxjs';
+import { merge } from 'lodash';
 
 function logErrors(item, msg, e) {
   logger.log('info', msg, {
