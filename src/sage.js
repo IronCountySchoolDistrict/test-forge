@@ -75,6 +75,7 @@ function testResultsTransform(observer) {
         fullSchoolYear,
         item.testResult.test_overall_score,
         item.matchingTestId,
+        'Composite',
         item);
 
       return matchingTestScore
