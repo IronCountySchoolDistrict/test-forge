@@ -58,7 +58,7 @@ export function msExecute(sql) {
   console.log('in msExecute Observable');
   return new Observable(observer => {
     config.database.sams.requestTimeout = 600000;
-    
+
     var connection = new mssql.Connection(config.database.sams, err => {
       var request = new mssql.Request(connection);
       request.stream = true;
@@ -67,6 +67,7 @@ export function msExecute(sql) {
         observer.next(row);
       });
       request.on('error', err => {
+        console.log('error == ', err);
         observer.error(err);
       });
       request.on('done', (returnValue, affected) => {
