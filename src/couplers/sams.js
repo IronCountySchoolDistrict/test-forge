@@ -15,13 +15,13 @@ export class SamsCoupler {
    * @returns {Observable}
    */
   from(channelName) {
-    if (channelName === 'Test Results') {
+    if (channelName === 'Test Result') {
       return getCrtTestResults();
-    } else if (channelName === 'Test Result Concepts') {
+    } else if (channelName === 'Test Result Concept') {
       return getCrtTestResultConcepts();
     } else if (channelName === 'U_StudentTestProficiency') {
       return getCrtProficiency();
-    } else if (channelName === 'Test Scores') {
+    } else if (channelName === 'Test Score') {
       return getCrtTestScores();
     }
   }
