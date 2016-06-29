@@ -217,7 +217,7 @@ export function getStudentIdsFromSsidBatchDual(ssids) {
           let newObj = {};
           Object.keys(result).forEach(key => {
             newObj[key.toLowerCase()] = result[key];
-          })
+          });
           return newObj;
         });
       });
