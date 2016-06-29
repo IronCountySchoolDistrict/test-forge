@@ -1,11 +1,23 @@
 require('babel-polyfill');
 
+/* external imports */
 import { createWriteStream, truncateSync } from 'fs';
 import Promise from 'bluebird';
 import { Observable } from '@reactivex/rxjs';
 import { isEmpty } from 'lodash';
 import { gustav } from 'gustav';
 import { merge, uniq, uniqWith, isEqual, truncate, extend, find } from 'lodash';
+
+/* couplers */
+import { SamsCoupler } from './couplers/sams';
+import { PowerSchoolCoupler } from './couplers/powerschool';
+import { CsvCoupler } from './couplers/csv';
+
+/* transformers */
+import { testResultConceptTransform } from './transformers/crt/testResultConcept';
+import { testScoreTransform } from './transformers/crt/testScore';
+import { testResultTransform } from './transformers/crt/testResult';
+import { proficiencyTransform } from './transformers/crt/proficiency';
 
 import {
   ssidToStudentNumber,
@@ -22,9 +34,7 @@ import {
 } from './service';
 import { logger } from './index';
 import { printObj } from './util';
-import { SamsCoupler } from './couplers/sams';
-import { PowerSchoolCoupler } from './couplers/powerschool';
-import { CsvCoupler } from './couplers/csv';
+
 
 function logErrors(item, msg, e) {
   logger.log('info', msg, {

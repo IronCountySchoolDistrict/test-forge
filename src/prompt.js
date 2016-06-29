@@ -43,7 +43,7 @@ async function promptTable() {
   let importQuestion = {
     type: 'list',
     name: 'table',
-    message: 'Which table/data set are you forging import data for?',
+    message: 'Which table/data set are you importing data for?',
     choices: [{
       name: 'Test Results',
       value: 'Test Results'
@@ -91,19 +91,19 @@ export async function promptHandlerSams(test) {
     let importQuestion = {
       type: 'list',
       name: 'table',
-      message: 'Which table/set are you forging import data for?',
+      message: 'Which table/set are you importing data for?',
       choices: [{
-        name: 'Test Results',
-        value: 'Test Results'
+        name: 'Test Result',
+        value: 'Test Result'
       }, {
-        name: 'Test Result Concepts',
-        value: 'Test Result Concepts'
+        name: 'Test Result Concept',
+        value: 'Test Result Concept'
       }, {
         name: 'U_StudentTestProficiency',
         value: 'U_StudentTestProficiency'
       }, {
-        name: 'Test Scores',
-        value: 'Test Scores'
+        name: 'Test Score',
+        value: 'Test Score'
       }]
     };
 

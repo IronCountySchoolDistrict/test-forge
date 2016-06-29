@@ -1,3 +1,17 @@
+import { uniqWith } from 'lodash';
+import { Observable } from '@reactivex/rxjs';
+import { getStudentIdsFromSsidBatchDual, getTestIdsFromNamesBatch } from '../../service';
+import { studentTestScoreDuplicateCheck } from '../../blogic';
+import {
+  correctConceptDesc,
+  correctTestProgramDesc,
+  createTestDate,
+  groupBy,
+  flatten,
+  mergeGroups,
+  toFullSchoolYear
+} from './util';
+
 /**
  * fix test_program_desc and concept_desc spelling errors and inconsistencies
  * @param {object} studentTestConceptResult row of crt data with student test concepts results
@@ -10,18 +24,6 @@ function correctConceptAndProgram(studentTestConceptResult) {
   studentTestConceptResult.concept_desc = correctConceptDesc(studentTestConceptResult.concept_desc);
   return studentTestConceptResult;
 }
-
-/**
- * create test date field based on year test was taken
- * @param {object} studentTestConceptResult row of crt data with student test concepts results
- * @param {string} studentTestConceptResult.school_year eg. "2001"
- * @return {object}
- */
-function createTestDate(studentTestConceptResult) {
-  studentTestConceptResult.test_date = new Date(`05/01/${studentTestConceptResult.school_year}`);
-  return studentTestConceptResultl
-}
-
 
 /**
  * extend each object with fields from PowerSchool, including the STUDENTS.ID and
@@ -91,7 +93,7 @@ function checkForDuplicatesAndCreateFinalObject(studentTestConceptResult) {
   });
 }
 
-export function testResultConceptsTransform(observer) {
+export function testResultConceptTransform(observer) {
   return observer
     .map(correctConceptAndProgram)
     .map(createTestDate)
