@@ -85,7 +85,7 @@ function checkForDuplicatesAndCreateFinalObject(studentTestConceptResult) {
         'Grade Level': studentTestConceptResult.grade_level,
         'Concept Score Percent': studentTestConceptResult.pct_of_questions_correct
       },
-      'extra': {
+      extra: {
         testProgramDesc: studentTestConceptResult.test_program_desc,
         studentTestId: studentTestConceptResult.student_test_id
       }
