@@ -96,9 +96,6 @@ export async function promptHandlerSams(test) {
         name: 'Test Result',
         value: 'Test Result'
       }, {
-        name: 'Test Result Concept',
-        value: 'Test Result Concept'
-      }, {
         name: 'U_StudentTestProficiency',
         value: 'U_StudentTestProficiency'
       }, {

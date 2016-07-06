@@ -17,8 +17,6 @@ export class SamsCoupler {
   from(channelName) {
     if (channelName === 'Test Result') {
       return getCrtTestResults();
-    } else if (channelName === 'Test Result Concept') {
-      return getCrtTestResultConcepts();
     } else if (channelName === 'U_StudentTestProficiency') {
       return getCrtProficiency();
     } else if (channelName === 'Test Score') {

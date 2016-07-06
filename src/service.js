@@ -301,6 +301,7 @@ export function getCrtTestResults() {
        [student_master].ssid,
        [student_enrollment].grade_level,
        [student_test].test_overall_score,
+       [student_test].student_test_id,
        [test_program].test_program_desc
     FROM   [sams_2008].[dbo].[student_test]
           INNER JOIN [sams_2008].[dbo].[student_enrollment]
@@ -325,6 +326,7 @@ export function getCrtTestResults() {
           [student_master].ssid,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
+          [student_test].student_test_id,
           [test_program].test_program_desc
     FROM   [sams_2009].[dbo].[student_test]
           INNER JOIN [sams_2009].[dbo]. [student_enrollment]
@@ -349,6 +351,7 @@ export function getCrtTestResults() {
           [student_master].ssid,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
+          [student_test].student_test_id,
           [test_program].test_program_desc
     FROM   [sams_2010].[dbo].[student_test]
           INNER JOIN [sams_2010].[dbo].[student_enrollment]
@@ -373,6 +376,7 @@ export function getCrtTestResults() {
           [student_master].ssid,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
+          [student_test].student_test_id,
           [test_program].test_program_desc
     FROM   [sams_2011].[dbo].[student_test]
           INNER JOIN [sams_2011].[dbo]. [student_enrollment]
@@ -397,6 +401,7 @@ export function getCrtTestResults() {
           [student_master].ssid,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
+          [student_test].student_test_id,
           [test_program].test_program_desc
     FROM   [sams_2012].[dbo].[student_test]
           INNER JOIN [sams_2012].[dbo].[student_enrollment]
@@ -421,6 +426,7 @@ export function getCrtTestResults() {
           [student_master].ssid,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
+          [student_test].student_test_id,
           [test_program].test_program_desc
     FROM   [sams_2013].[dbo].[student_test]
           INNER JOIN [sams_2013].[dbo]. [student_enrollment]
@@ -445,6 +451,7 @@ export function getCrtTestResults() {
           [student_master].ssid,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
+          [student_test].student_test_id,
           [test_program].test_program_desc
     FROM   [sams_merge].[dbo].[student_test]
           INNER JOIN [sams_merge].[dbo]. [student_enrollment]
@@ -469,6 +476,7 @@ export function getCrtTestResults() {
           [student_master].ssid,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
+          [student_test].student_test_id,
           [test_program].test_program_desc
     FROM   [Success_2008].[dbo].[student_test]
           INNER JOIN [Success_2008].[dbo]. [student_enrollment]
@@ -493,6 +501,7 @@ export function getCrtTestResults() {
           [student_master].ssid,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
+          [student_test].student_test_id,
           [test_program].test_program_desc
     FROM   [Success_2009].[dbo].[student_test]
           INNER JOIN [Success_2009].[dbo]. [student_enrollment]
@@ -517,6 +526,7 @@ export function getCrtTestResults() {
           [student_master].ssid,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
+          [student_test].student_test_id,
           [test_program].test_program_desc
     FROM   [Success_2010].[dbo].[student_test]
           INNER JOIN [Success_2010].[dbo]. [student_enrollment]
@@ -541,6 +551,7 @@ export function getCrtTestResults() {
           [student_master].ssid,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
+          [student_test].student_test_id,
           [test_program].test_program_desc
     FROM   [Success_2011].[dbo].[student_test]
           INNER JOIN [Success_2011].[dbo]. [student_enrollment]
@@ -565,6 +576,7 @@ export function getCrtTestResults() {
           [student_master].ssid,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
+          [student_test].student_test_id,
           [test_program].test_program_desc
     FROM   [Success_2012].[dbo].[student_test]
           INNER JOIN [Success_2012].[dbo]. [student_enrollment]
@@ -589,6 +601,7 @@ export function getCrtTestResults() {
           [student_master].ssid,
           [student_enrollment].grade_level,
           [student_test].test_overall_score,
+          [student_test].student_test_id,
           [test_program].test_program_desc
     FROM   [Success_2013].[dbo].[student_test]
           INNER JOIN [Success_2013].[dbo]. [student_enrollment]
@@ -939,7 +952,7 @@ export function getCrtProficiency() {
   `);
 }
 
-export function getCrtTestResultConcepts() {
+export function getCrtTestResultConceptsForStudentTest(studentTestId) {
   return msExecute(`
     SELECT DISTINCT
       student_test.school_year,
@@ -975,6 +988,7 @@ export function getCrtTestResultConcepts() {
       INNER JOIN sams_2008.dbo.test_concept
         ON sams_2008.dbo.student_test_concept.concept_id = sams_2008.dbo.test_concept.concept_id AND
            sams_2008.dbo.test_concept.test_prog_id = sams_2008.dbo.student_test_concept.test_prog_id
+      WHERE sams_2008.dbo.student_test.student_test_id = @student_test_id
     UNION
     SELECT DISTINCT
       student_test.school_year,
@@ -1010,6 +1024,7 @@ export function getCrtTestResultConcepts() {
       INNER JOIN sams_2009.dbo.test_concept
         ON sams_2009.dbo.student_test_concept.concept_id = sams_2009.dbo.test_concept.concept_id AND
            sams_2009.dbo.test_concept.test_prog_id = sams_2009.dbo.student_test_concept.test_prog_id
+        WHERE [sams_2009].[dbo].[student_test].[student_test_id] = @student_test_id
     UNION
     SELECT DISTINCT
       student_test.school_year,
@@ -1047,6 +1062,7 @@ export function getCrtTestResultConcepts() {
            sams_2010.dbo.test_concept.concept_id AND
            sams_2010.dbo.test_concept.test_prog_id =
            sams_2010.dbo.student_test_concept.test_prog_id
+      WHERE sams_2010.dbo.student_test.student_test_id = @student_test_id
     UNION
     SELECT DISTINCT
       student_test.school_year,
@@ -1084,6 +1100,7 @@ export function getCrtTestResultConcepts() {
            sams_2011.dbo.test_concept.concept_id AND
            sams_2011.dbo.test_concept.test_prog_id =
            sams_2011.dbo.student_test_concept.test_prog_id
+      WHERE sams_2011.dbo.student_test.student_test_id = @student_test_id
     UNION
     SELECT DISTINCT
       student_test.school_year,
@@ -1121,6 +1138,7 @@ export function getCrtTestResultConcepts() {
            sams_2012.dbo.test_concept.concept_id AND
            sams_2012.dbo.test_concept.test_prog_id =
            sams_2012.dbo.student_test_concept.test_prog_id
+      WHERE sams_2012.dbo.student_test.student_test_id = @student_test_id
     UNION
     SELECT DISTINCT
       student_test.school_year,
@@ -1158,6 +1176,7 @@ export function getCrtTestResultConcepts() {
            sams_2013.dbo.test_concept.concept_id AND
            sams_2013.dbo.test_concept.test_prog_id =
            sams_2013.dbo.student_test_concept.test_prog_id
+      WHERE sams_2013.dbo.student_test.student_test_id = @student_test_id
     UNION
     SELECT DISTINCT
       student_test.school_year,
@@ -1195,6 +1214,7 @@ export function getCrtTestResultConcepts() {
            sams_merge.dbo.test_concept.concept_id AND
            sams_merge.dbo.test_concept.test_prog_id =
            sams_merge.dbo.student_test_concept.test_prog_id
+      WHERE sams_merge.dbo.student_test.student_test_id = @student_test_id
     UNION
     SELECT DISTINCT
       student_test.school_year,
@@ -1232,6 +1252,7 @@ export function getCrtTestResultConcepts() {
            success_2008.dbo.test_concept.concept_id AND
            success_2008.dbo.test_concept.test_prog_id =
            success_2008.dbo.student_test_concept.test_prog_id
+      WHERE success_2008.dbo.student_test.student_test_id = @student_test_id
     UNION
     SELECT DISTINCT
       student_test.school_year,
@@ -1269,6 +1290,7 @@ export function getCrtTestResultConcepts() {
            success_2009.dbo.test_concept.concept_id AND
            success_2009.dbo.test_concept.test_prog_id =
            success_2009.dbo.student_test_concept.test_prog_id
+      WHERE success_2009.dbo.student_test.student_test_id = @student_test_id
     UNION
     SELECT DISTINCT
       student_test.school_year,
@@ -1306,6 +1328,7 @@ export function getCrtTestResultConcepts() {
            success_2010.dbo.test_concept.concept_id AND
            success_2010.dbo.test_concept.test_prog_id =
            success_2010.dbo.student_test_concept.test_prog_id
+      WHERE success_2010.dbo.student_test.student_test_id = @student_test_id
     UNION
     SELECT DISTINCT
       student_test.school_year,
@@ -1343,6 +1366,7 @@ export function getCrtTestResultConcepts() {
            success_2011.dbo.test_concept.concept_id AND
            success_2011.dbo.test_concept.test_prog_id =
            success_2011.dbo.student_test_concept.test_prog_id
+      WHERE success_2011.dbo.student_test.student_test_id = @student_test_id
     UNION
     SELECT DISTINCT
       student_test.school_year,
@@ -1380,6 +1404,7 @@ export function getCrtTestResultConcepts() {
            success_2012.dbo.test_concept.concept_id AND
            success_2012.dbo.test_concept.test_prog_id =
            success_2012.dbo.student_test_concept.test_prog_id
+      WHERE success_2012.dbo.student_test.student_test_id = @student_test_id
     UNION
     SELECT DISTINCT
       student_test.school_year,
@@ -1417,7 +1442,10 @@ export function getCrtTestResultConcepts() {
            success_2013.dbo.test_concept.concept_id AND
            success_2013.dbo.test_concept.test_prog_id =
            success_2013.dbo.student_test_concept.test_prog_id
-  `);
+      WHERE success_2013.dbo.student_test.student_test_id = @student_test_id
+    `, {
+      student_test_id: studentTestId
+    });
 }
 
 export function getCrtTestScores() {

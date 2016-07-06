@@ -5,7 +5,8 @@
  * @return {object}
  */
 export function createTestDate(studentTestConceptResult) {
-  studentTestConceptResult.test_date = new Date(`05/01/${studentTestConceptResult.school_year}`);
+  const testDate = new Date(`05/01/${studentTestConceptResult.school_year}`);
+  studentTestConceptResult.test_date = `${testDate.getMonth() + 1}/${testDate.getDay() + 1}/${testDate.getFullYear()}`
   return studentTestConceptResult;
 }
 

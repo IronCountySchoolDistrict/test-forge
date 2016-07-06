@@ -16,11 +16,13 @@ import { msExecute } from './database';
 import { promptHandlerFile, promptHandlerSams } from './prompt';
 import { setOrawrapConfig } from './database';
 
+var Promise = Bluebird;
+
+// Project-wide globals
 export var oraWrapInst;
 export var logger;
 export var config;
 
-var Promise = Bluebird;
 
 /**
  * @return {object}

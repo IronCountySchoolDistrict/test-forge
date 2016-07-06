@@ -65,8 +65,8 @@ export function createWorkflow(prompt) {
       params.channel.groupByProperty = 'extra.testProgramDesc';
       params.channel.outputProperty = 'csvOutput';
     } else if (prompt.table === 'Test Result Concept') {
-      params.channel.groupByProperty = '';
-      params.channel.outputProperty = '';
+      params.channel.groupByProperty = 'extra.testProgramDesc';
+      params.channel.outputProperty = 'csvOutput';
     } else if (prompt.table === 'U_StudentTestProficiency') {
       params.channel.groupByProperty = 'extra.testProgramDesc';
       params.channel.outputProperty = 'csvOutput';

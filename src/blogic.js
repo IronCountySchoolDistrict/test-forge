@@ -6,7 +6,8 @@ import {
   getTestFromName,
   getMatchingStudentTestScore,
   getMatchingProficiency,
-  getStudentIdsFromSsidBatchDual
+  getStudentIdsFromSsidBatchDual,
+  getCrtTestResultConceptsForStudentTest
 } from './service';
 import cache from 'memory-cache';
 import { printObj } from './util';
@@ -195,6 +196,24 @@ export function studentTestScoreDuplicateCheck(studentNumber, fullSchoolYear, te
       return Observable.of(true);
     })
     .filter(studentTestScore => !studentTestScore);
+}
+
+export function studentTestToConceptResults(studentTestId, item) {
+  return getCrtTestResultConceptsForStudentTest(studentTestId)
+    .map(testResultConcept => {
+      console.log('testResultConcept == ', testResultConcept);
+      // Expecting there to NOT be any matching student test score record,
+      // so if there is one or more, throw an exception
+      if (!studentTestScore) {
+        throw {
+          studentTestScore: testResultConcept,
+          testResult: item.testResult,
+          message: `expected studentTestToConceptResult to return > 0 records, got ${testResultConcept.rows.length} rows`
+        };
+      } else {
+        return testResultConcept;
+      }
+    });
 }
 
 /**
