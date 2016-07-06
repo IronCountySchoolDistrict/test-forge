@@ -62,21 +62,31 @@ export function execute(sql, bind, opts) {
 }
 
 /**
- * create and execute an SQL query
+ *
+ * @return {Promise}
+ */
+function createMsConn() {
+  config.database.sams.requestTimeout = 600000;
+  let msConn = mssql.connect(config.database.sams);
+  console.log('msConn == ', msConn);
+  msConnPool = msConn;
+  return msConn;
+}
+
+/**
+ * create and execute a SQL query
  * @param {string} sql
  * @param {object} inputParams
  * @return {observable}
  */
 export function msExecute(sql, inputParams) {
   return new Observable(observer => {
-    config.database.sams.requestTimeout = 600000;
-
     if (!msConnPool) {
-      var connection = new mssql.Connection(config.database.sams, err => {
-        if (err) {
-          console.log('error == ', err);
-        }
-        var request = new mssql.Request(connection);
+      createMsConn();
+    }
+    msConnPool
+      .then((connection) => {
+        var request = new mssql.Request(msConnPool);
         if (inputParams) {
           Object.keys(inputParams).forEach(paramName => {
             request.input(paramName, inputParams[paramName]);
@@ -93,12 +103,9 @@ export function msExecute(sql, inputParams) {
         });
         request.on('done', (returnValue, affected) => {
           console.log('finished request');
-          connection.close();
           observer.complete();
         });
-      });
-      connection.on('error', error => console.log(`mssql error == ${error}`));
-      msConnPool = connection;
-    }
+      })
+      .catch(error => console.log(`mssql error == ${error}`));
   });
 }
