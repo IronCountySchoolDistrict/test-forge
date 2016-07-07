@@ -3,15 +3,10 @@ require('babel-polyfill');
 import Promise from 'bluebird';
 import orawrap from 'orawrap';
 import fs from 'fs-promise';
-import {
-  Observable
-} from '@reactivex/rxjs';
+import { Observable } from '@reactivex/rxjs';
 import mssql from 'mssql';
 
-import {
-  oraWrapInst,
-  config
-} from './index';
+import { oraWrapInst, config } from './index';
 
 var msConnPool;
 
