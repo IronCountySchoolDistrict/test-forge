@@ -3,12 +3,13 @@ import { Observable } from '@reactivex/rxjs';
 import {
   createTestDate,
   correctTestProgramDesc,
+  correctConceptDesc,
   toFullSchoolYear,
   groupBy,
   flatten,
   mergeGroups
 } from './util';
-import { studentTestToConceptResults } from '../../blogic';
+import { studentTestToConceptResults, studentTestScoreDuplicateCheck } from '../../blogic';
 import { getStudentIdsFromSsidBatchDual, getTestIdsFromNamesBatch } from '../../service';
 
 /**
@@ -28,25 +29,46 @@ function mergeSsidAndTest(testResults) {
     getTestIdsFromNamesBatch(distinctTestNames),
 
     (studentIds, testIds) => {
-      const studentIdGroups = groupBy(item => parseInt(item.ssid), testResults);
-      const testNameGroups = groupBy(item => `EOL - ${item.test_program_desc}`, testResults);
+      let studentIdGroups = groupBy(item => parseInt(item.ssid), testResults);
+      studentIdGroups = mergeGroups(
+        studentIdGroups,
+        studentIds,
+        item => parseInt(item.ssid),
+        item => !item.student_id || !item.student_number
+      );
+      let mergedFlattenedStudentIds = flatten(studentIdGroups);
 
-      mergeGroups(studentIdGroups, studentIds, item => parseInt(item.ssid));
-      mergeGroups(testNameGroups, testIds, item => item.test_name);
+      let testNameGroups = groupBy(item => `EOL - ${item.test_program_desc}`, mergedFlattenedStudentIds);
+      testNameGroups = mergeGroups(
+        testNameGroups,
+        testIds,
+        item => item.test_name,
+        item => !item.test_id
+      );
+      let mergedFlattendedTestNames = flatten(testNameGroups);
       return flatten(studentIdGroups);
     }
   );
 }
 
+
 function mergeTestResultConcept(testResult) {
   return Observable.zip(
-    studentTestToConceptResults(testResult.student_test_id, testResult),
+    studentTestToConceptResults(testResult.student_test_id, testResult).bufferCount(100),
 
     (testResultConcepts) => {
-      console.log('testResultConcepts == ', testResultConcepts);
-      const distinctTestResultConcepts = uniqWith(testResultConcept, isEqual);
-      testResults.resultConcepts = distinctTestResultConcepts;
-      return testResults;
+      let distinctTestResultConcepts = testResultConcepts
+        .map(testResultConcept => {
+          testResultConcept.test_program_desc = correctTestProgramDesc(testResultConcept.test_program_desc);
+          return testResultConcept;
+        })
+        .map(testResultConcept => {
+          testResultConcept.concept_desc = correctConceptDesc(testResultConcept.concept_desc);
+          return testResultConcept
+        });
+      distinctTestResultConcepts = uniqWith(distinctTestResultConcepts, isEqual);
+      testResult.resultConcepts = distinctTestResultConcepts;
+      return testResult;
     }
   );
 }
@@ -78,9 +100,9 @@ function checkForDuplicatesAndCreateFinalObject(testResult) {
           studentTestId: testResult.student_test_id
         }
       };
-      if (finalObject.resultConcepts) {
-        finalObject.resultConcepts.forEach(resultConcept => {
-          finalObject.csvOutput[`${finalObject.resultConcept.concept_desc} Percent`] = resultConcept.pct_of_questions_correct;
+      if (testResult.resultConcepts) {
+        testResult.resultConcepts.forEach(resultConcept => {
+          finalObject.csvOutput[`${resultConcept.concept_desc} Percent`] = resultConcept.pct_of_questions_correct;
         });
       }
 
