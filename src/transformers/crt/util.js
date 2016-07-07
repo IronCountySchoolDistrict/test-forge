@@ -1,3 +1,5 @@
+import { logErrors } from '../../logger';
+
 /**
  * create test date field based on year test was taken
  * @param {object} studentTestConceptResult row of crt data with student test concepts results
@@ -111,23 +113,40 @@ export function groupBy(keyExtract, arr) {
   }, new Map());
 }
 
-export function mergeGroups(groups, array, mergeKeyExtract) {
+/**
+ * iterate through @param array, find matches in @param groups,
+ * and extend each object with new fields from each element in @param array
+ * @param  {Map}      groups
+ * @param  {array}    array
+ * @param  {function} mergeKeyExtract
+ * @param  {function} mergeNullCheck
+ * @return {Map}
+ */
+export function mergeGroups(groups, array, mergeKeyExtract, mergeNullCheck) {
   try {
     array.forEach(it => {
       try {
-        const mergeKey = mergeKeyExtract(it);
-        const group = groups.get(mergeKey);
-        if (!group) {
-          throw `${mergeKey} not found`;
+        let hasMatch = true;
+        if (mergeNullCheck(it)) {
+          hasMatch = false;
         }
-        group.map(item => {
-          return Object.assign(item, it);
-        });
+        const mergeKey = mergeKeyExtract(it);
+        let group = groups.get(mergeKey);
+        if (!group) {
+          throw `${mergeKey} not found in groups`;
+        }
+        if (hasMatch) {
+        	group.forEach(item => Object.assign(item, it));
+        } else {
+          throw `${mergeKeyExtract(it)} not found in PowerSchool`;
+        }
 
       } catch (e) {
-        console.log(it, e);
+        groups.delete(mergeKeyExtract(it));
+        logErrors(it, e, e);
       }
     });
+    return groups;
   } catch (e) {
     console.log('merge error');
     console.log(e);
@@ -135,7 +154,7 @@ export function mergeGroups(groups, array, mergeKeyExtract) {
   }
 }
 
-export function flatten(groups, arrayMap) {
+export function flatten(groups) {
   let arr = []
   for (const [index, group] of groups.entries()) {
     arr.push(...group);
