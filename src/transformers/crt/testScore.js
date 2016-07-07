@@ -14,7 +14,7 @@ import { getTestIdsFromNamesBatch } from '../../service';
 function correctConceptAndProgram(testScore) {
   testScore.test_program_desc = correctTestProgramDesc(testScore.test_program_desc);
   testScore.concept_desc = correctConceptDesc(testScore.concept_desc);
-  return studentTestResult;
+  return testScore;
 }
 
 /**
@@ -33,9 +33,9 @@ function mergeTestIdAndCreateFinalObject(testScores) {
 
     testIds => {
       return distinctTestScores.map(item => {
-        let matchingTestId = testIds.rows.filter(testId => testId.test_name === `EOL - ${item.test_program_desc}`);
+        let matchingTestId = testIds.filter(testId => testId.test_name === `EOL - ${item.test_program_desc}`);
         if (matchingTestId.length) {
-          item.testId = matchingTestId[0].ID;
+          item.testId = matchingTestId[0].test_id;
         }
         item.scoreName = truncate(item.concept_desc, {
           length: 35,
