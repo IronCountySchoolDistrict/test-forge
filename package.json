@@ -22,7 +22,7 @@
     "babel-plugin-transform-regenerator": "^6.9.0",
     "babel-polyfill": "^6.9.1",
     "babel-runtime": "^6.9.2",
-    "npm": "^3.10.2",
+    "npm": "^3.10.3",
     "regenerator": "^0.8.46"
   },
   "dependencies": {
@@ -32,8 +32,8 @@
     "csv": "^1.1.0",
     "fs-promise": "^0.5.0",
     "gustav": "^0.7.2",
-    "inquirer": "^1.1.0",
-    "json2csv": "^3.5.0",
+    "inquirer": "^1.1.2",
+    "json2csv": "^3.6.0",
     "lodash": "^4.13.1",
     "memory-cache": "^0.1.6",
     "mssql": "^3.3.0",
