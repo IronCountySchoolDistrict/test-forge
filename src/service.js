@@ -269,7 +269,7 @@ export function createTestScore(testId, name, description) {
       :testid,
       :name,
       :description,
-      (SELECT max(sortorder) + 1
+      (SELECT nvl(max(sortorder) + 1, 0)
        FROM testscore
        WHERE testid = :testid)
     FROM DUAL
