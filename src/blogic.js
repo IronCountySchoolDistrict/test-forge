@@ -201,10 +201,7 @@ export function studentTestScoreDuplicateCheck(studentNumber, fullSchoolYear, te
 export function studentTestToConceptResults(studentTestId, item) {
   return getCrtTestResultConceptsForStudentTest(studentTestId)
     .map(testResultConcept => {
-      console.log('testResultConcept == ', testResultConcept);
-      // Expecting there to NOT be any matching student test score record,
-      // so if there is one or more, throw an exception
-      if (!studentTestScore) {
+      if (!testResultConcept) {
         throw {
           studentTestScore: testResultConcept,
           testResult: item.testResult,
