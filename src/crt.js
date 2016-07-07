@@ -14,7 +14,6 @@ import { PowerSchoolCoupler } from './couplers/powerschool';
 import { CsvCoupler } from './couplers/csv';
 
 /* transformers */
-import { testResultConceptTransform } from './transformers/crt/testResultConcept';
 import { testScoreTransform } from './transformers/crt/testScore';
 import { testResultTransform } from './transformers/crt/testResult';
 import { proficiencyTransform } from './transformers/crt/proficiency';
@@ -88,14 +87,11 @@ function transformer(config, observer) {
   if (config.table === 'Test Result') {
     return testResultTransform(observer);
   }
-  if (config.table === 'Test Result Concept') {
-    return testResultConceptTransform(observer);
-  }
   if (config.table === 'U_StudentTestProficiency') {
     return proficiencyTransform(observer);
   }
   if (config.table === 'Test Score') {
-    return crtTestScoreTransform(observer);
+    return testScoreTransform(observer);
   }
 }
 
