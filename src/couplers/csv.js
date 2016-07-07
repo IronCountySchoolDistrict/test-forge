@@ -4,6 +4,7 @@ import {createWriteStream, truncateSync} from 'fs';
 import json2csv from 'json2csv';
 import Promise from 'bluebird';
 import {property} from 'lodash';
+import { closeMsConn } from '../database';
 
 var toCSV = Promise.promisify(json2csv);
 
@@ -93,6 +94,7 @@ export class CsvCoupler {
 
           () => {
             console.log('close writestream');
+            closeMsConn();
             ws.end();
           }
         );

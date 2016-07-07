@@ -63,9 +63,16 @@ export function execute(sql, bind, opts) {
 function createMsConn() {
   config.database.sams.requestTimeout = 600000;
   let msConn = mssql.connect(config.database.sams);
-  console.log('msConn == ', msConn);
   msConnPool = msConn;
   return msConn;
+}
+
+export function closeMsConn() {
+  if (msConnPool) {
+    msConnPool.then((connection) => {
+      connection.close();
+    });
+  }
 }
 
 /**
@@ -97,7 +104,6 @@ export function msExecute(sql, inputParams) {
           observer.error(err);
         });
         request.on('done', (returnValue, affected) => {
-          console.log('finished request');
           observer.complete();
         });
       })
