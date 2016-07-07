@@ -7,9 +7,8 @@ export class PowerSchoolCoupler {
   }
 
   to(channelName, observable) {
-    if (channelName === 'Test Scores') {
-      return observable
-        .subscribe(testScore => {
+    if (channelName === 'Test Score') {
+      return observable.subscribe(testScore => {
           createTestScore(testScore.testId, testScore.scoreName, testScore.concept_desc);
         });
     }
