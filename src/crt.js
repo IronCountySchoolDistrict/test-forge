@@ -33,18 +33,7 @@ import {
 } from './service';
 import { logger } from './index';
 import { printObj } from './util';
-
-
-function logErrors(item, msg, e) {
-  logger.log('info', msg, {
-    psDbError: printObj(e)
-  });
-  if (item) {
-    logger.log('info', 'Source Data Record: ', {
-      sourceData: printObj(item)
-    });
-  }
-}
+import { logErrors } from './logger';
 
 export function createWorkflow(prompt) {
   gustav.addCoupler(new SamsCoupler());

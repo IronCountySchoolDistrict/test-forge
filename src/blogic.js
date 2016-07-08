@@ -10,21 +10,13 @@ import {
   getCrtTestResultConceptsForStudentTest
 } from './service';
 import cache from 'memory-cache';
-import { printObj } from './util';
-import { logger } from './index';
 import { Observable } from '@reactivex/rxjs';
 import { merge } from 'lodash';
 
-function logErrors(item, msg, e) {
-  logger.log('info', msg, {
-    psDbError: printObj(e)
-  });
-  if (item) {
-    logger.log('info', 'Source Data Record: ', {
-      sourceData: printObj(item)
-    });
-  }
-}
+import { logger } from './index';
+import { printObj } from './util';
+import { logErrors } from './logger';
+
 
 /**
  *
