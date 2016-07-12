@@ -2,6 +2,7 @@ require('babel-polyfill');
 
 import Promise from 'bluebird';
 import orawrap from 'orawrap';
+import oracledb from 'oracledb';
 import fs from 'fs-promise';
 import { Observable } from '@reactivex/rxjs';
 import mssql from 'mssql';
@@ -9,18 +10,8 @@ import mssql from 'mssql';
 import { oraWrapInst, config } from './index';
 
 var msConnPool;
+var oraConnPool;
 
-export async function setOrawrapConfig() {
-  let oraWrapInst = orawrap;
-  return new Promise((resolve, reject) => {
-    oraWrapInst.createPool(config.database.oracle, (err, pool) => {
-      if (err) {
-        reject(err);
-      }
-      resolve(oraWrapInst);
-    });
-  });
-}
 
 /**
  * orawrap requires only the parameters that will be used be passed to it. This function removes the null args,
@@ -31,29 +22,18 @@ export async function setOrawrapConfig() {
  * @return {Promise}
  */
 export function execute(sql, bind, opts) {
-  let args = [];
-  for (let i = 0; i < arguments.length; i++) {
-    args.push(arguments[i]);
+  if (!oraConnPool) {
+    createOraPool();
   }
+  return oraConnPool
+    .then(pool => pool.getConnection())
+    .then(conn => conn.execute(sql, bind, opts));
+}
 
-  // remove any null arguments
-  args.filter(elem => !!elem);
-
-  return new Promise((resolve, reject) => {
-    let cb = function(err, results) {
-      if (err) {
-        reject(err);
-      }
-      resolve(results);
-    };
-    args.push(cb);
-    //global orawrap instance created in index.js
-    try {
-      oraWrapInst.execute.apply(orawrap, args);
-    } catch (e) {
-      console.error(e.stack);
-    }
-  });
+function createOraPool() {
+  let oraPool = oracledb.createPool(config.database.oracle);
+  oraConnPool = oraPool;
+  return oraPool;
 }
 
 /**

@@ -37,7 +37,7 @@
     "lodash": "^4.13.1",
     "memory-cache": "^0.1.6",
     "mssql": "^3.3.0",
-    "orawrap": "^0.2.4",
+    "oracledb": "^1.10.0",
     "split": "^1.0.0",
     "winston": "^2.1.1"
   },
