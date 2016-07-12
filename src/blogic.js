@@ -7,7 +7,8 @@ import {
   getMatchingStudentTestScore,
   getMatchingProficiency,
   getStudentIdsFromSsidBatchDual,
-  getCrtTestResultConceptsForStudentTest
+  getCrtTestResultConceptsForStudentTest,
+  getCrtTestResults
 } from './service';
 import cache from 'memory-cache';
 import { Observable } from '@reactivex/rxjs';
@@ -15,6 +16,7 @@ import { merge } from 'lodash';
 
 import { logger } from './index';
 import { printObj } from './util';
+import { correctConceptDesc } from './transformers/crt/util';
 import { logErrors } from './logger';
 
 
@@ -296,4 +298,21 @@ export function testRecordToMatchingDcid(studentNumber, fullSchoolYear, testScor
       return Observable.of(null);
     })
     .filter(studentTestScore => !!studentTestScore);
+}
+
+export function getTestResultsAndTestConcepts() {
+  return getCrtTestResults()
+    .groupBy(item => item.student_test_id)
+    .flatMap(group => group
+      .reduce((prev, curr) => {
+        const correctedConceptDesc = correctConceptDesc(curr.concept_desc);
+        prev[correctedConceptDesc] = curr.pct_of_questions_correct;
+        Object.keys(curr).forEach(key => {
+          if (key !== 'concept_desc' && key !== 'pct_of_questions_correct') {
+            prev[key] = curr[key];
+          }
+        });
+        return prev;
+      }, { student_test_id: group.key })
+    )
 }
