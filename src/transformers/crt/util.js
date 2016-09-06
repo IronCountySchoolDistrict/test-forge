@@ -142,8 +142,12 @@ export function mergeGroups(groups, array, mergeKeyExtract, mergeNullCheck) {
         }
 
       } catch (e) {
-        groups.delete(mergeKeyExtract(it));
-        logErrors(it, e, e);
+        logErrors(it, e, groups.get(mergeKeyExtract(it)));
+        let group = groups.get(mergeKeyExtract(it));
+
+        if (group) {
+          groups.delete(mergeKeyExtract(it));
+        }
       }
     });
     return groups;
