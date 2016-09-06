@@ -12,15 +12,17 @@ import { zipObject } from 'lodash';
 import csv from 'csv';
 import Bluebird from 'bluebird';
 
-import { msExecute }   from './database';
+import { msExecute } from './database';
 import { promptHandlerFile, promptHandlerSams } from './prompt';
 import { setOrawrapConfig } from './database';
 
+var Promise = Bluebird;
+
+// Project-wide globals
 export var oraWrapInst;
 export var logger;
 export var config;
 
-var Promise = Bluebird;
 
 /**
  * @return {object}
@@ -67,7 +69,6 @@ async function main() {
   });
   logger.log('info', `starting up test-forge`);
   config = await getConfig();
-  oraWrapInst = await setOrawrapConfig();
 
   let jsonPackage = await getPackage();
   program

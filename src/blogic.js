@@ -6,24 +6,19 @@ import {
   getTestFromName,
   getMatchingStudentTestScore,
   getMatchingProficiency,
-  getStudentIdsFromSsidBatchDual
+  getStudentIdsFromSsidBatchDual,
+  getCrtTestResultConceptsForStudentTest,
+  getCrtTestResults
 } from './service';
 import cache from 'memory-cache';
-import {printObj} from './util';
-import {logger} from './index';
-import {Observable} from '@reactivex/rxjs';
-import {merge} from 'lodash';
+import { Observable } from '@reactivex/rxjs';
+import { merge } from 'lodash';
 
-function logErrors(item, msg, e) {
-  logger.log('info', msg, {
-    psDbError: printObj(e)
-  });
-  if (item) {
-    logger.log('info', 'Source Data Record: ', {
-      sourceData: printObj(item)
-    });
-  }
-}
+import { logger } from './index';
+import { printObj } from './util';
+import { correctConceptDesc } from './transformers/crt/util';
+import { logErrors } from './logger';
+
 
 /**
  *
@@ -35,13 +30,13 @@ export function ssidsToStudentIds(ssids) {
       const mergedStudentIds = ssids
         .map(ssid => {
           const matchingStudentIdItem = studentIds.rows.filter(studentId => {
-            return parseInt(studentId.SSID) === ssid
+            return parseInt(studentId.ssid) === ssid
           });
           if (matchingStudentIdItem.length) {
             return {
               ssid: ssid,
-              studentId: matchingStudentIdItem[0].STUDENT_ID,
-              studentNumber: matchingStudentIdItem[0].STUDENT_NUMBER
+              studentId: matchingStudentIdItem[0].student_id,
+              studentNumber: matchingStudentIdItem[0].student_number
             };
           } else {
             let errorObj = {
@@ -55,7 +50,7 @@ export function ssidsToStudentIds(ssids) {
         .filter(item => !!item);
       //mergedArray still contains null elements that should be filtered
       return Observable.of(mergedStudentIds);
-    })
+    });
 }
 
 export function ssidToStudentNumber(ssid, item) {
@@ -167,14 +162,15 @@ export function testNameToDcid(testName, item) {
  * checks for existing StudentTestScore records that match the `item` record passed in
  * @return {observable}
  */
-export function studentTestScoreDuplicateCheck(studentNumber, fullSchoolYear, testScore, testId, item) {
+export function studentTestScoreDuplicateCheck(studentNumber, fullSchoolYear, testScore, testId, scoreName, item) {
   return Observable.fromPromise(
-    getMatchingStudentTestScore(
-      studentNumber,
-      fullSchoolYear,
-      testScore,
-      testId
-    )
+      getMatchingStudentTestScore(
+        studentNumber,
+        fullSchoolYear,
+        testScore,
+        testId,
+        scoreName
+      )
     )
     .map(studentTestScore => {
       // Expecting there to NOT be any matching student test score record,
@@ -196,15 +192,63 @@ export function studentTestScoreDuplicateCheck(studentNumber, fullSchoolYear, te
     .filter(studentTestScore => !studentTestScore);
 }
 
+export function studentTestToConceptResults(studentTestId, item) {
+  return getCrtTestResultConceptsForStudentTest(studentTestId)
+    .map(testResultConcept => {
+      if (!testResultConcept) {
+        throw {
+          studentTestScore: testResultConcept,
+          testResult: item.testResult,
+          message: `expected studentTestToConceptResult to return > 0 records, got ${testResultConcept.rows.length} rows`
+        };
+      } else {
+        return testResultConcept;
+      }
+    });
+}
+
+/**
+ * checks for existing StudentTestScore records that match the `item` record passed in
+ * @return {observable}
+ */
+export function studentTestResultConceptSDuplicateCheck(studentNumber, fullSchoolYear, testScore, testId, scoreName, item) {
+  return Observable.fromPromise(
+      getMatchingStudentTestScore(
+        studentNumber,
+        fullSchoolYear,
+        testScore,
+        testId,
+        scoreName
+      )
+    )
+    .map(studentTestScore => {
+      // Expecting there to NOT be any matching student test score record,
+      // so if there is one or more, throw an exception
+      if (studentTestScore.rows.length) {
+        throw {
+          studentTestScore: studentTestScore,
+          testResult: item.testResult,
+          message: `expected checkDuplicateStudentTestScore to return 0 records, got ${studentTestScore.rows.length} rows`
+        };
+      } else {
+        return null; // Returning a truthy value will allow the current record to be processed
+      }
+    })
+    .catch(e => {
+      logErrors(item, `Error checking for matching student test records for studentNumber: ${studentNumber}`, e);
+      return Observable.of(true);
+    })
+    .filter(studentTestScore => !studentTestScore);
+}
 
 export function proficiencyDuplicateCheck(studentNumber, fullSchoolYear, testScore, testId, item) {
   return Observable.fromPromise(
-    getMatchingProficiency(
-      studentNumber,
-      fullSchoolYear,
-      testScore,
-      testId
-    )
+      getMatchingProficiency(
+        studentNumber,
+        fullSchoolYear,
+        testScore,
+        testId
+      )
     )
     .map(proficiency => {
       if (proficiency.rows.length) {
@@ -229,12 +273,12 @@ export function proficiencyDuplicateCheck(studentNumber, fullSchoolYear, testSco
 
 export function testRecordToMatchingDcid(studentNumber, fullSchoolYear, testScore, testId, item) {
   return Observable.fromPromise(
-    getMatchingStudentTestScore(
-      studentNumber,
-      fullSchoolYear,
-      testScore,
-      testId
-    )
+      getMatchingStudentTestScore(
+        studentNumber,
+        fullSchoolYear,
+        testScore,
+        testId
+      )
     )
     .map(studentTestScore => {
       // Expecting there to NOT be any matching student test score record,
@@ -254,4 +298,24 @@ export function testRecordToMatchingDcid(studentNumber, fullSchoolYear, testScor
       return Observable.of(null);
     })
     .filter(studentTestScore => !!studentTestScore);
+}
+
+export function getTestResultsAndTestConcepts() {
+  return getCrtTestResults()
+    .groupBy(item => item.student_test_id)
+    .flatMap(group => group
+      .reduce((prev, curr) => {
+        const correctedConceptDesc = correctConceptDesc(curr.concept_desc);
+        prev.resultConcepts.push({
+          concept: correctedConceptDesc,
+          score: curr.pct_of_questions_correct
+        });
+        Object.keys(curr).forEach(key => {
+          if (key !== 'concept_desc' && key !== 'pct_of_questions_correct') {
+            prev[key] = curr[key];
+          }
+        });
+        return prev;
+      }, { student_test_id: group.key, resultConcepts: [] })
+    )
 }

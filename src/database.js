@@ -2,23 +2,16 @@ require('babel-polyfill');
 
 import Promise from 'bluebird';
 import orawrap from 'orawrap';
+import oracledb from 'oracledb';
 import fs from 'fs-promise';
 import { Observable } from '@reactivex/rxjs';
 import mssql from 'mssql';
 
 import { oraWrapInst, config } from './index';
 
-export async function setOrawrapConfig() {
-  let oraWrapInst = orawrap;
-  return new Promise((resolve, reject) => {
-    oraWrapInst.createPool(config.database.oracle, (err, pool) => {
-      if (err) {
-        reject(err);
-      }
-      resolve(oraWrapInst);
-    });
-  });
-}
+var msConnPool;
+var oraConnPool;
+
 
 /**
  * orawrap requires only the parameters that will be used be passed to it. This function removes the null args,
@@ -28,53 +21,78 @@ export async function setOrawrapConfig() {
  * @param  {object} [opts]
  * @return {Promise}
  */
-export function execute(sql, bind, opts) {
-  let args = [];
-  for (let i = 0; i < arguments.length; i++) {
-    args.push(arguments[i]);
+export function execute(sql, bind, opts, callingFunc) {
+
+  if (!oraConnPool) {
+    createOraPool();
   }
-
-  // remove any null arguments
-  args.filter(elem => !!elem);
-
-  return new Promise((resolve, reject) => {
-    let cb = function (err, results) {
-      if (err) {
-        reject(err);
-      }
-      resolve(results);
-    };
-    args.push(cb);
-    //global orawrap instance created in index.js
-    try {
-      oraWrapInst.execute.apply(orawrap, args);
-    } catch (e) {
-      console.error(e.stack);
-    }
-  });
+  return oraConnPool
+    .then(pool => pool.getConnection())
+    .then(conn => conn.execute(sql, bind, opts)
+        .then(results => {
+          conn.close();
+          return results;
+        })
+    );
 }
 
-export function msExecute(sql) {
-  console.log('in msExecute Observable');
-  return new Observable(observer => {
-    config.database.sams.requestTimeout = 600000;
-    
-    var connection = new mssql.Connection(config.database.sams, err => {
-      var request = new mssql.Request(connection);
-      request.stream = true;
-      request.query(sql);
-      request.on('row', row => {
-        observer.next(row);
-      });
-      request.on('error', err => {
-        observer.error(err);
-      });
-      request.on('done', (returnValue, affected) => {
-        console.log('finished request');
-        connection.close();
-        observer.complete();
-      });
+function createOraPool() {
+  let oraPool = oracledb.createPool(config.database.oracle);
+  oraConnPool = oraPool;
+  return oraPool;
+}
+
+/**
+ *
+ * @return {Promise}
+ */
+function createMsConn() {
+  config.database.sams.requestTimeout = 600000;
+  let msConn = mssql.connect(config.database.sams);
+  msConnPool = msConn;
+  return msConn;
+}
+
+export function closeMsConn() {
+  if (msConnPool) {
+    msConnPool.then((connection) => {
+      connection.close();
     });
-    connection.on('error', error => console.log(`mssql error == ${error}`));
+  }
+}
+
+/**
+ * create and execute a SQL query
+ * @param {string} sql
+ * @param {object} inputParams
+ * @return {observable}
+ */
+export function msExecute(sql, inputParams) {
+  return new Observable(observer => {
+    if (!msConnPool) {
+      createMsConn();
+    }
+    msConnPool
+      .then((connection) => {
+        var request = new mssql.Request(msConnPool);
+        if (inputParams) {
+          Object.keys(inputParams).forEach(paramName => {
+            request.input(paramName, inputParams[paramName]);
+          });
+        }
+        request.stream = true;
+        request.query(sql);
+        request.on('row', row => {
+          observer.next(row);
+        });
+        request.on('error', err => {
+          console.log('error == ', err);
+          observer.error(err);
+        });
+        request.on('done', (returnValue, affected) => {
+          observer.complete();
+        });
+      })
+      .catch(error => console.log(`mssql error == ${error}`));
   });
 }

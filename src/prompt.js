@@ -9,7 +9,13 @@ import detect from './detector';
 import * as sage from './sage';
 import * as crt from './crt';
 import * as dibels from './dibels';
-import { getMatchingTests, getTestFromName, getCrtTestResults, getCrtProficiency } from './service';
+import {
+  getMatchingTests,
+  getTestFromName,
+  getCrtTestResults,
+  getCrtProficiency,
+  getCrtTestScores
+} from './service';
 
 var toCSV = Bluebird.promisify(json2csv);
 
@@ -37,17 +43,14 @@ async function promptTable() {
   let importQuestion = {
     type: 'list',
     name: 'table',
-    message: 'Which table/data set are you forging import data for?',
-    choices: [
-      {
-        name: 'Test Results',
-        value: 'Test Results'
-      },
-      {
-        name: 'U_StudentTestProficiency',
-        value: 'U_StudentTestProficiency'
-      }
-    ]
+    message: 'Which table/data set are you importing data for?',
+    choices: [{
+      name: 'Test Results',
+      value: 'Test Results'
+    }, {
+      name: 'U_StudentTestProficiency',
+      value: 'U_StudentTestProficiency'
+    }]
   };
 
   let importTable = await prompt([importQuestion]);
@@ -88,37 +91,43 @@ export async function promptHandlerSams(test) {
     let importQuestion = {
       type: 'list',
       name: 'table',
-      message: 'Which table/set are you forging import data for?',
+      message: 'Which table/set are you importing data for?',
       choices: [{
-        name: 'Test Results',
-        value: 'Test Results'
+        name: 'Test Result',
+        value: 'Test Result'
       }, {
-          name: 'U_StudentTestProficiency',
-          value: 'U_StudentTestProficiency'
-        }, {
-          name: 'U_StudentTestSubscore',
-          value: 'U_StudentTestSubscore'
-        }, {
-          name: 'U_TestSubscore',
-          value: 'U_TestSubscore'
-        }]
+        name: 'U_StudentTestProficiency',
+        value: 'U_StudentTestProficiency'
+      }, {
+        name: 'Test Score',
+        value: 'Test Score'
+      }]
     };
 
-    let table = await prompt([importQuestion]);
-    console.log(`Creating test data for table: ${table.table}`);
+    let { table } = await prompt([importQuestion]);
+
+    let destQuestion = {
+      type: 'list',
+      name: 'dest',
+      message: 'Please choose the destination for your data',
+      choices: [{
+        name: 'CSV',
+        value: 'CSV'
+      }, {
+        name: 'Database',
+        value: 'Database'
+      }]
+    };
+
+    let { dest } = await prompt([destQuestion]);
+
     let promptResps = {
-      table: table.table
+      table,
+      dest
     };
 
-    let source;
-    if (promptResps.table === 'Test Results') {
-      source = await getCrtTestResults();
-    } else {
-      source = await getCrtProficiency();
-    }
-    source.count().subscribe(x => console.log('count == ', x));
+    const workflow = crt.createWorkflow(promptResps);
 
-    let workflow = crt.createWorkflow(source, promptResps);
     workflow.start();
   } catch (e) {
     console.error(e.stack);

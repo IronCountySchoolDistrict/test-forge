@@ -44,6 +44,7 @@ function testResultsTransform(config, observable) {
         item['School Year'],
         item['Composite Score'],
         config.prompt.testId,
+        'Composite',
         item);
 
       return Observable.zip(
