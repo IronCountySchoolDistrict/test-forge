@@ -69,12 +69,6 @@ async function main() {
   });
   logger.log('info', `starting up test-forge`);
   config = await getConfig();
-  try {
-    oraWrapInst = await setOrawrapConfig();
-  } catch (e) {
-    console.log('error setting up orawrap');
-    console.log(e);
-  }
 
   let jsonPackage = await getPackage();
   program
