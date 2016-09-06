@@ -26,27 +26,14 @@ export function execute(sql, bind, opts, callingFunc) {
   if (!oraConnPool) {
     createOraPool();
   }
-  const rnd = Math.random() * 100;
-  console.time(rnd);
   return oraConnPool
-    .then(pool => {
-      console.log(pool._logStats());
-      return pool.getConnection();
-    })
-    .then(conn => {
-      const rnd = Math.random() * 100;
-      if (callingFunc) {
-        console.time(`${callingFunc} ${rnd}`);
-      }
-      return conn.execute(sql, bind, opts)
+    .then(pool => pool.getConnection())
+    .then(conn => conn.execute(sql, bind, opts)
         .then(results => {
-          if (callingFunc) {
-            console.timeEnd(`${callingFunc} ${rnd}`);
-          }
           conn.close();
           return results;
         })
-    });
+    );
 }
 
 function createOraPool() {
