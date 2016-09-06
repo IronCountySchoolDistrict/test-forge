@@ -101,8 +101,9 @@ function checkForDuplicatesAndCreateFinalObject(testResult) {
         }
       };
       if (testResult.resultConcepts) {
+        testResult.resultConcepts = uniqWith(testResult.resultConcepts, isEqual);
         testResult.resultConcepts.forEach(resultConcept => {
-          finalObject.csvOutput[`${resultConcept.concept_desc} Percent`] = resultConcept.pct_of_questions_correct;
+          finalObject.csvOutput[`${resultConcept.concept} Percent`] = resultConcept.score;
         });
       }
 
@@ -117,6 +118,5 @@ export function testResultTransform(observable) {
     .bufferCount(500)
     .flatMap(mergeSsidAndTest)
     .flatMap(item => Observable.from(item))
-    .flatMap(mergeTestResultConcept)
     .flatMap(checkForDuplicatesAndCreateFinalObject);
 }

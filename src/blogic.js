@@ -306,13 +306,16 @@ export function getTestResultsAndTestConcepts() {
     .flatMap(group => group
       .reduce((prev, curr) => {
         const correctedConceptDesc = correctConceptDesc(curr.concept_desc);
-        prev[correctedConceptDesc] = curr.pct_of_questions_correct;
+        prev.resultConcepts.push({
+          concept: correctedConceptDesc,
+          score: curr.pct_of_questions_correct
+        });
         Object.keys(curr).forEach(key => {
           if (key !== 'concept_desc' && key !== 'pct_of_questions_correct') {
             prev[key] = curr[key];
           }
         });
         return prev;
-      }, { student_test_id: group.key })
+      }, { student_test_id: group.key, resultConcepts: [] })
     )
 }
